@@ -1,0 +1,15 @@
+[package]
+name = "pas"
+version = "0.1.0"
+authors = ["Stanislav Bohm <spirali@kreatrix.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hashbrown = "*"
+smallvec = "1.4.0"
+nom = "*"
+itertools = "*"
+structopt = "0.3"
+png = "*"
