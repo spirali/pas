@@ -8,6 +8,7 @@ pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
         LoPredicate::EqConst(name, value) => AutomaticSet::singleton(name.clone(), value.clone()),
         LoPredicate::Eq(name1, name2) => AutomaticSet::equivalence(name1.clone(), name2.clone()),
         LoPredicate::Add(name1, name2, name3) => AutomaticSet::addition(name1.clone(), name2.clone(), name3.clone()),
+        LoPredicate::Double(name1, name2) => AutomaticSet::double(name1.clone(), name2.clone()),
         LoPredicate::True => AutomaticSet::trivial(true),
         LoPredicate::False => AutomaticSet::trivial(false),
         p => panic!("Not implemented predicate {:?}", p)
@@ -29,7 +30,7 @@ pub fn build_set(set_def: &SetDef) -> AutomaticSet {
     assert!(set_def.vars().iter().all(|x| uniq.insert(x.clone())));
 
     let formula = set_def.formula().make_lo_formula();
-    dbg!(&formula);
+    //dbg!(&formula);
     let mut aset = evaluate_formula(&formula);
 
     for name in formula.free_vars() {
@@ -48,6 +49,7 @@ mod tests {
     use super::*;
     use crate::parser::parse_formula;
     use crate::name::Name;
+    use crate::words::iterate_words;
 
     #[test]
     fn test_eval_eq_formula() {
@@ -135,6 +137,42 @@ mod tests {
         for i in 10..20 {
             assert!(!a.test_input(&[("x", i)]));
         }
+    }
+
+    #[test]
+    fn test_eval_mul_formula() {
+        let mut a = evaluate_formula(&parse_formula("2 * x < 10").make_lo_formula());
+        for i in 0..5 {
+            assert!(a.test_input(&[("x", i)]));
+        }
+        for i in 6..20 {
+            assert!(!a.test_input(&[("x", i)]));
+        }
+
+        let mut a = evaluate_formula(&parse_formula("3 * x == 60").make_lo_formula());
+        dbg!(a.track_names());
+        for i in 0..100 {
+            assert_eq!(a.test_input(&[("x", i)]), i == 20);
+        }
+
+        //let mut a = evaluate_formula(&parse_formula("1325 * x == 147075").make_lo_formula());
+
+        let f = parse_formula("11 * x == 3 * y").make_lo_formula();
+        let mut a = evaluate_formula(&f);
+        assert!(a.test_input(&[("x", 0), ("y", 0)]));
+        assert!(a.test_input(&[("x", 3), ("y", 11)]));
+
+
+
+        let mut a = evaluate_formula(&f);
+        /*a.clone().to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/x.dot"), true).unwrap();
+        iterate_words(&a.clone().to_dfa(), Some(10), |w|  println!("WW {:?}", w));*/
+
+        let f = parse_formula("111 * x == 30 * y").make_lo_formula();
+        let mut a = evaluate_formula(&f);
+        assert!(a.test_input(&[("x", 30), ("y", 111)]));
+        assert!(!a.test_input(&[("x", 31), ("y", 111)]));
+        assert!(!a.test_input(&[("x", 30), ("y", 110)]));
     }
 
     #[test]

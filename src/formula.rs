@@ -5,7 +5,7 @@ use crate::formula::LoPredicate::EqConst;
 #[derive(Debug)]
 pub enum LoPredicate {
     Add(Name, Name, Name), // x + y = z
-    Mul(Name, u64, Name),  // C * x = y
+    Double(Name, Name),    // 2 * x = y
     Eq(Name, Name),        // x == y
     EqConst(Name, u64),    // x == C
     True,
@@ -13,6 +13,7 @@ pub enum LoPredicate {
 }
 
 impl LoPredicate {
+
     pub fn free_vars(&self) -> HashSet<Name> {
         let mut out = HashSet::new();
         match self {
@@ -21,7 +22,7 @@ impl LoPredicate {
                 out.insert(name2.clone());
                 out.insert(name3.clone());
             },
-            Self::Eq(name1, name2) | Self::Mul(name1, _, name2) => {
+            Self::Eq(name1, name2) | Self::Double(name1, name2) => {
                 out.insert(name1.clone());
                 out.insert(name2.clone());
             },
@@ -47,20 +48,17 @@ impl LoPredicate {
         } else if name2 == name3 {
             LoPredicate::EqConst(name1, 0)
         } else if name1 == name2 {
-            LoPredicate::Mul(name1, 2, name2)
+            LoPredicate::Double(name1, name2)
         } else {
             LoPredicate::Add(name1, name2, name3)
         }
     }
 
-    pub fn safe_mul(name1: Name, value: u64, name2: Name) -> LoPredicate {
+    pub fn safe_double(name1: Name, name2: Name) -> LoPredicate {
         if name1 == name2 {
-            match value {
-                1 => LoPredicate::True,
-                _ => LoPredicate::EqConst(name2, 0),
-            }
+            LoPredicate::EqConst(name2, 0)
         } else {
-            LoPredicate::Mul(name1, value, name2)
+            LoPredicate::Double(name1, name2)
         }
     }
 
@@ -106,9 +104,9 @@ impl LoFormula {
         LoFormula::Exists(name, Box::new(self))
     }
 
-    pub fn close_if_tmp(self, name: Name) -> LoFormula {
+    pub fn close_if_tmp(self, name: &Name) -> LoFormula {
         if name.is_tmp() {
-            self.exists(name)
+            self.exists(name.clone())
         } else {
             self
         }
@@ -116,6 +114,22 @@ impl LoFormula {
 
     pub fn for_all(self, name: Name) -> LoFormula {
         self.neg().exists(name).neg()
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Predicate(p) => 1,
+            Self::Neg(f) | Self::Exists(_, f) => f.size() + 1,
+            Self::Or(f1, f2) => f1.size() + f2.size() + 1,
+        }
+    }
+
+    pub fn depth(&self) -> usize {
+        match self {
+            Self::Predicate(p) => 1,
+            Self::Neg(f) | Self::Exists(_, f) => f.depth() + 1,
+            Self::Or(f1, f2) => f1.depth().max(f2.depth()) + 1,
+        }
     }
 
     pub fn free_vars(self) -> HashSet<Name> {
@@ -163,6 +177,9 @@ impl HiPredicate {
             ([Atom::Variable(name1, 1), Atom::Variable(name2, 1)], [Atom::Variable(name3, 1)]) => {
                 Some(LoPredicate::safe_add(name1.clone(), name2.clone(), name3.clone()).to_formula())
             },
+            ([Atom::Variable(name1, 2)], [Atom::Variable(name2, 1)]) => {
+                Some(LoPredicate::safe_double(name1.clone(), name2.clone()).to_formula())
+            },
             ([Atom::Variable(name, 1)], [Atom::Constant(c)]) => {
                 Some(LoPredicate::EqConst(name.clone(), *c).to_formula())
             },
@@ -200,7 +217,7 @@ impl HiPredicate {
                             LoPredicate::safe_add(name2.clone(), fresh.clone(), name1.clone()).to_formula().exists(fresh).neg()
                         }
                     };
-                    f.and(lf).close_if_tmp(name1).and(rf).close_if_tmp(name2)
+                    f.and(lf).close_if_tmp(&name1).and(rf).close_if_tmp(&name2)
                 }
             },
             HiPredicate::True => LoFormula::Predicate(LoPredicate::True),
@@ -216,11 +233,40 @@ impl HiPredicate {
                 (LoPredicate::EqConst(fresh.clone(), *v).to_formula(), fresh)
             },
             Atom::Variable(v, 1) => (LoPredicate::True.to_formula(), v.clone()),
-            Atom::Variable(v, x) => {
-                let fresh = Name::new_tmp();
-                (LoPredicate::safe_mul(v.clone(), *x, fresh.clone()).to_formula(), fresh)
+            Atom::Variable(v, 0) => (LoPredicate::EqConst(v.clone(), 0).to_formula(), v.clone()),
+            Atom::Variable(v, mut x) => {
+                //let mut value = x;
+                let mut exp_var = v.clone();
+                let mut out_var = None;
+                let mut formula = LoPredicate::True.to_formula();
+                loop {
+                    let mut close = true;
+                    if x & 1 == 1 {
+                        if out_var.is_none() {
+                            out_var = Some(exp_var.clone());
+                            close = false;
+                        } else {
+                            let fresh2 = Name::new_tmp();
+                            let var = out_var.take().unwrap();
+                            formula = formula.and(LoPredicate::safe_add(var.clone(), exp_var.clone(), fresh2.clone()).to_formula()).close_if_tmp(&var);
+                            out_var = Some(fresh2);
+                        }
+                    }
+                    x >>= 1;
+                    if x == 0 {
+                        if close {
+                            formula = formula.close_if_tmp(&exp_var);
+                        }
+                        return (formula, out_var.unwrap());
+                    }
+                    let mut fresh = Name::new_tmp();
+                    formula = formula.and(LoPredicate::safe_double(exp_var.clone(), fresh.clone()).to_formula());
+                    if close {
+                        formula = formula.close_if_tmp(&exp_var);
+                    }
+                    exp_var = fresh;
+                }
             }
-            _ => todo!(),
         }
     }
 
@@ -234,7 +280,7 @@ impl HiPredicate {
         let (f1, name1) = Self::atom_to_lo_formula(&atoms[0]);
         let (f2, name2) = Self::expr_to_lo_formula(&atoms[1..]);
         let f3 = LoFormula::Predicate(LoPredicate::safe_add(name1.clone(), name2.clone(), fresh.clone()));
-        (f3.and(f1).close_if_tmp(name1).and(f2).close_if_tmp(name2), fresh)
+        (f3.and(f1).close_if_tmp(&name1).and(f2).close_if_tmp(&name2), fresh)
     }
 }
 

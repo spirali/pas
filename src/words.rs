@@ -241,7 +241,7 @@ mod tests {
 
 
     #[test]
-    fn test_words_list() {
+    fn test_words_list1() {
         //let a = build_set(&parse_setdef("{ x | x == 220 or x == 10}")).to_dfa();
 
         /*let a = build_set(&parse_setdef("{ x | x == 220 or x == 10}")).to_dfa();
@@ -253,6 +253,20 @@ mod tests {
         println!("{}", collect_words(&a, Some(700)).len());
         assert_eq!(collect_words(&a, Some(700)), vec![vec![220], vec![10]]);
         assert_eq!(collect_words(&a, Some(700)), vec![vec![220], vec![10]]);
+    }
+
+    #[test]
+    fn test_words_list2() {
+        //let a = build_set(&parse_setdef("{ x | x == 220 or x == 10}")).to_dfa();
+
+        /*let a = build_set(&parse_setdef("{ x | x == 220 or x == 10}")).to_dfa();
+        assert!(collect_words(&a, Some(0)).is_empty());
+        assert_eq!(collect_words(&a, Some(7)), vec![vec![220], vec![10]]);
+        assert_eq!(collect_words(&a, Some(1)), vec![vec![220]]);*/
+
+        let a = build_set(&parse_setdef("{ x, y | 11 * x == 3 * y and not (x == 0) }")).to_dfa();
+        println!("{}", collect_words(&a, Some(2)).len());
+        assert_eq!(collect_words(&a, Some(1)), vec![vec![3], vec![11]]);
     }
 
     #[test]

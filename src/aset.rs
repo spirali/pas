@@ -44,6 +44,20 @@ impl AutomaticSet {
         }
     }
 
+    pub fn double(name1: Name, name2: Name) -> AutomaticSet {
+        /* name1 * 2 = name2 */
+        assert_ne!(name1, name2);
+        let table = TransitionTable::new(2, vec![
+            0, 1, 2, 2,
+            2, 2, 0, 1,
+            2, 2, 2, 2,
+        ]);
+        AutomaticSet {
+            automaton: Automaton::Dfa(Dfa::new(table, vec![true, false, false])),
+            track_names: vec![name1, name2]
+        }
+    }
+
     pub fn trivial(accepting: bool) -> AutomaticSet {
         AutomaticSet {
             automaton: Automaton::Dfa(Dfa::trivial(accepting)),
@@ -290,5 +304,18 @@ mod tests {
         assert!(dfa.test_input(number_to_word2(0, 10).into_iter()));
         assert!(!dfa.test_input(number_to_word2(2, 0).into_iter()));
         assert!(!dfa.test_input(number_to_word2(10, 0).into_iter()));
+    }
+
+    #[test]
+    fn test_double() {
+        let n = Name::from_str("x");
+        let m = Name::from_str("y");
+        let aset1 = AutomaticSet::double(n.clone(), m.clone());
+        let dfa = aset1.to_dfa();
+        for i in 0..51 {
+            for j in 0..71 {
+                assert_eq!(dfa.test_input(number_to_word2(i, j).into_iter()), i * 2 == j);
+            }
+        }
     }
 }
