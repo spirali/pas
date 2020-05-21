@@ -2,63 +2,206 @@ use crate::dfa::Dfa;
 use crate::nfa::Nfa;
 use crate::common::{StateId};
 use hashbrown::{HashMap, HashSet};
+use itertools::Itertools;
+use crate::words::Bound::Finite;
 
 pub fn iterate_words<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>, mut callback: F) {
-
     if let Some(0) = limit {
         return;
     }
 
-    let mut stack = Vec::new();
-    let mut tracks = Vec::new();
+    let dfa = dfa.reverse().determinize().minimize();
 
     let n_tracks = dfa.n_tracks();
     if n_tracks == 0 {
         todo!()
     }
+
+    let short = shortest_words(&dfa);
+    let long = longest_words(&dfa);
+
+    //let mut stack = Vec::new();
+    let mut tracks = Vec::new();
+
     tracks.resize(n_tracks, 0);
-    /*if dfa.is_accepting(0) {
+
+    dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
+
+    fn push(tracks: &mut Vec<usize>, symbol: usize) {
+        for (i, t) in tracks.iter_mut().enumerate() {
+            *t <<= 1;
+            *t |= (symbol >> i) & 1;
+        }
+    }
+
+    fn pop(tracks: &mut Vec<usize>) {
+        for (i, t) in tracks.iter_mut().enumerate() {
+            *t >>= 1;
+        }
+    }
+
+    struct ComputationDef {
+        dfa: Dfa,
+        short: Vec<Option<usize>>,
+        long: Vec<Bound>,
+    };
+
+    let c_def = ComputationDef {
+        dfa,
+        short,
+        long,
+    };
+
+    struct ComputationState<F: FnMut(&[usize])> {
+        tracks: Vec<usize>,
+        limit: Option<usize>,
+        callback: F,
+    };
+
+    let mut c_state = ComputationState {
+        callback,
+        tracks,
+        limit,
+    };
+
+    if c_def.dfa.is_accepting(0) {
+        (c_state.callback)(c_state.tracks.as_slice());
+        c_state.limit.as_mut().map(|v| *v -= 1);
+        if let Some(0) = c_state.limit {
+            return;
+        }
+    }
+
+    fn compute<F: FnMut(&[usize])>(c_def: &ComputationDef, c_state: &mut ComputationState<F>, state: StateId, length: usize) -> bool {
+        if length == 0 {
+            if c_def.dfa.is_accepting(state) {
+                (c_state.callback)(c_state.tracks.as_slice());
+                c_state.limit.as_mut().map(|v| *v -= 1);
+                if let Some(0) = c_state.limit {
+                    return true;
+                }
+            }
+            return false;
+        }
+        let new_length = length - 1;
+        let transitions = c_def.dfa.get_state(state);
+        for a in 0..c_def.dfa.alphabet_size() {
+            let new_state = transitions[a];
+            match c_def.short[new_state as usize] {
+                None => continue,
+                Some(x) if new_length < x => continue,
+                _ => { /* Do nothing */ }
+            };
+            match c_def.long[new_state as usize] {
+                Finite(x) if new_length > x => continue,
+                _ => { /* Do nothing */ }
+            };
+            push(&mut c_state.tracks, a);
+            if compute(c_def, c_state, new_state, new_length) {
+                return true;
+            }
+            pop(&mut c_state.tracks);
+        }
+        return false;
+    }
+
+    let asize = c_def.dfa.alphabet_size();
+    let mut length = 1;
+    loop {
+        let mut finished = true;
+
+        for a in 1..asize /* 1 is correct here! */ {
+            for t in c_state.tracks.iter_mut() {
+                *t = 0;
+            }
+            push(&mut c_state.tracks, a);
+            let new_state = c_def.dfa.get_state(0)[a];
+            if Bound::Finite(length - 1) <= c_def.long[new_state as usize] {
+                finished = false;
+                if compute(&c_def, &mut c_state, new_state, length - 1) {
+                    return;
+                }
+            }
+        }
+        if finished {
+            return;
+        }
+        length += 1;
+    }
+
+
+
+    /*
+    dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
+
+    if dfa.is_accepting(0) {
         callback(tracks.as_slice());
         limit.as_mut().map(|v| *v -= 1);
         if let Some(0) = limit {
             return;
         }
-    }*/
+    }
 
-    stack.push((0, 0));
+    dbg!(&short);
+    dbg!(&long);
+
+    let start = if let Some(x) = short[0] { x.max(1) } else {
+        return;
+    };
+
+
+    /*let end = match long[0] {
+        Bound::None => unreachable!(),
+        Bound::Finite(x) => x.max(1),
+        Bound::Infinite => ,
+    };*/
+
     let a_size = dfa.alphabet_size();
-
-    while let Some((state, mut sym)) = stack.pop() {
-        //dbg!(&stack);
-        let ssize = stack.len();
-        let mask = 1 << ssize;
-
-        if sym == 0 && dfa.get_state(state)[sym] == state {
-            if dfa.is_accepting(state) /*&& tracks.iter().any(|x| (*x & mask) > 0)*/ {
-                callback(tracks.as_slice());
-                limit.as_mut().map(|v| *v -= 1);
-                if let Some(0) = limit {
-                    return;
+    dbg!(start);
+    for length in start..=std::mem::size_of::<usize>() * 8 {
+        for t in tracks.iter_mut() {
+            *t = 0;
+        }
+        stack.push((0, 1)); // Start from 1 not 0!
+        let len = length;
+        while let Some((state, mut step)) = stack.pop() {
+            if step == a_size {
+                pop(&mut tracks);
+                continue;
+            }
+            let new_state = dfa.get_state(state)[step];
+            println!("state ={} , new_state={}, {} {}", &state, &new_state, stack.len(), len);
+            if stack.len() == len {
+                /*dbg!(&stack);
+                dbg!(&tracks);
+                dbg!(&len);
+                dbg!(&state);
+                dbg!(&new_state);
+                debug_assert!(dfa.is_accepting(new_state));*/
+                /*dbg!(dfa.accepting());
+                dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();*/
+                if dfa.is_accepting(new_state) {
+                    push(&mut tracks, step);
+                    callback(tracks.as_slice());
+                    pop(&mut tracks);
+                    limit.as_mut().map(|v| *v -= 1);
+                    if let Some(0) = limit {
+                        return;
+                    }
+                }
+                continue;
+            }
+            stack.push((state, step + 1));
+            if let Some(min) = short[new_state as usize] {
+                let rest = len - stack.len();
+                println!("rest={}, min={}", rest, min);
+                if min < rest && Bound::Finite(rest) <= long[new_state as usize] {
+                    push(&mut tracks, step);
+                    stack.push((new_state, 0));
                 }
             }
-            sym = a_size
         }
-
-        if sym == a_size {
-            for t in tracks.iter_mut() {
-                *t = *t & !mask;
-            }
-            continue;
-        }
-
-        for (i, t) in tracks.iter_mut().enumerate() {
-            *t = (*t & !mask) | (((sym & (1 << i)) >> i) << ssize);
-        }
-
-        let new_state = dfa.get_state(state)[sym];
-        stack.push((state, sym + 1));
-        stack.push((new_state, 0));
-    }
+    }*/
 }
 
 
@@ -120,6 +263,26 @@ pub enum Bound {
     Infinite,
 }
 
+impl Bound {
+
+    #[inline]
+    pub fn increase(&self) -> Bound {
+        match self {
+            Self::Finite(x) => Self::Finite(x + 1),
+            x => *x
+        }
+    }
+
+    pub fn to_limit(&self) -> Option<usize> {
+        match self {
+            Self::None => Some(0),
+            Self::Finite(x) => Some(x + 1),
+            Self::Infinite => None,
+        }
+    }
+}
+
+
 impl ToString for Bound {
     fn to_string(&self) -> String {
         match self {
@@ -159,17 +322,12 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         }
     }
 
-    //dbg!(s_next);
-
     let mut s_current = Vec::<StateId>::with_capacity(dfa.n_states());
     while !s_next.is_empty() {
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();
         for s in &s_current {
-            let mut length : Bound = match dfa.get_state(*s).iter().map(|c| output[*c as usize]).max().unwrap() {
-                Bound::Finite(x) => Bound::Finite(x + 1),
-                bound => bound,
-            };
+            let mut length : Bound = dfa.get_state(*s).iter().map(|c| output[*c as usize]).max().unwrap().increase();
             if dfa.is_accepting(*s) {
                 length = length.max(Bound::Finite(0))
             }
@@ -178,6 +336,36 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         }
     }
 
+    output
+}
+
+pub fn shortest_words(dfa: &Dfa) -> Vec<Option<usize>>
+{
+    let mut output = vec![None; dfa.n_states()];
+//    let mut remaining = vec![dfa.alphabet_size(); dfa.n_states()];
+    let mut n_next = HashSet::<StateId>::with_capacity(dfa.n_states());
+    let mut reverse = vec![Vec::<StateId>::new(); dfa.n_states()];
+
+    for (i, (s, a)) in dfa.states().enumerate() {
+        let state_id = i as StateId;
+        for t in s {
+            reverse[*t as usize].push(state_id);
+        }
+        if a {
+            n_next.insert(state_id);
+        }
+    }
+
+    let mut step = 0;
+    while !n_next.is_empty() {
+        for state_id in std::mem::take(&mut n_next) {
+            if output[state_id as usize].is_none() {
+                output[state_id as usize] = Some(step);
+                n_next.extend(reverse[state_id as usize].iter());
+            }
+        }
+        step += 1;
+    }
     output
 }
 
@@ -248,11 +436,9 @@ mod tests {
         assert!(collect_words(&a, Some(0)).is_empty());
         assert_eq!(collect_words(&a, Some(7)), vec![vec![220], vec![10]]);
         assert_eq!(collect_words(&a, Some(1)), vec![vec![220]]);*/
-
-        let a = build_set(&parse_setdef("{ x, y | (x < 10 and y < 3) or (x + y == 10)}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x, y | x > 3 and (x + y == 10)}")).to_dfa();
         println!("{}", collect_words(&a, Some(700)).len());
-        assert_eq!(collect_words(&a, Some(700)), vec![vec![220], vec![10]]);
-        assert_eq!(collect_words(&a, Some(700)), vec![vec![220], vec![10]]);
+        assert_eq!(collect_words(&a, Some(3)), vec![vec![7, 3], vec![5, 5], vec![6, 4]]);
     }
 
     #[test]
@@ -266,7 +452,22 @@ mod tests {
 
         let a = build_set(&parse_setdef("{ x, y | 11 * x == 3 * y and not (x == 0) }")).to_dfa();
         println!("{}", collect_words(&a, Some(2)).len());
-        assert_eq!(collect_words(&a, Some(1)), vec![vec![3], vec![11]]);
+        assert_eq!(collect_words(&a, Some(3)), vec![vec![3, 11], vec![6, 22], vec![9, 33]]);
+    }
+
+    #[test]
+    fn test_words_list3() {
+        let a = build_set(&parse_setdef("{ x | x == 1 }")).to_dfa();
+        assert_eq!(collect_words(&a, Some(2)), vec![vec![1]]);
+
+        let a = build_set(&parse_setdef("{ x | x == 2 }")).to_dfa();
+        assert_eq!(collect_words(&a, Some(2)), vec![vec![2]]);
+
+        let a = build_set(&parse_setdef("{ x | x == 1234567 }")).to_dfa();
+        assert_eq!(collect_words(&a, Some(2)), vec![vec![1234567]]);
+
+        let a = build_set(&parse_setdef("{ x | x == 314 or x == 25 }")).to_dfa();
+        assert_eq!(collect_words(&a, Some(2)), vec![vec![25], vec![314]]);
     }
 
     #[test]
@@ -281,6 +482,27 @@ mod tests {
         assert_eq!(longest_words(&dfa), vec![Bound::Finite(1), Bound::Finite(0), Bound::None]);
         let dfa = Dfa::new(TransitionTable::new(1, vec![1, 1, 2, 2, 2, 2]), vec![true, true, false]);
         assert_eq!(longest_words(&dfa), vec![Bound::Finite(1), Bound::Finite(0), Bound::None]);
+    }
+
+    #[test]
+    fn test_shortest_words() {
+        let dfa = Dfa::new(TransitionTable::new(1, vec![0, 1, 1, 0]), vec![true, false]);
+        assert_eq!(shortest_words(&dfa), vec![Some(0), Some(1)]);
+
+        let dfa = Dfa::new(TransitionTable::new(1, vec![0, 1, 1, 0]), vec![false, false]);
+        assert_eq!(shortest_words(&dfa), vec![None, None]);
+
+        let dfa = Dfa::new(TransitionTable::new(1, vec![0, 1, 1, 0]), vec![true, true]);
+        assert_eq!(shortest_words(&dfa), vec![Some(0), Some(0)]);
+
+        let dfa = Dfa::new(TransitionTable::new(1, vec![1, 1, 1, 1]), vec![true, false]);
+        assert_eq!(shortest_words(&dfa), vec![Some(0), None]);
+
+        let dfa = Dfa::new(TransitionTable::new(1, vec![1, 1, 1, 1]), vec![false, true]);
+        assert_eq!(shortest_words(&dfa), vec![Some(1), Some(0)]);
+
+        let dfa = Dfa::new(TransitionTable::new(1, vec![1, 2, 2, 2, 3, 3, 4, 3, 4, 4]), vec![false, false, false, false, true]);
+        assert_eq!(shortest_words(&dfa), vec![Some(3), Some(3), Some(2), Some(1), Some(0)]);
     }
 
     #[test]

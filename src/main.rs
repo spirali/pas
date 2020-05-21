@@ -9,6 +9,7 @@ mod formula;
 mod solver;
 mod parser;
 mod words;
+mod render;
 
 use structopt::StructOpt;
 use std::path::Path;
@@ -17,6 +18,7 @@ use std::fs;
 use crate::parser::{setdef, parse_exact, unwrap_nom};
 use crate::solver::build_set;
 use crate::words::get_max;
+use crate::render::render_set;
 
 #[derive(Debug, StructOpt)]
 enum Command {
@@ -26,6 +28,9 @@ enum Command {
         with_sink: bool,
         #[structopt(long)]
         reverse: bool
+    },
+    Render {
+        output: String,
     },
     Range,
     IsEmpty
@@ -67,6 +72,10 @@ fn main() {
         },
         Command::IsEmpty => {
             println!("Empty: {}", aset.is_empty());
+        }
+        Command::Render { output } => {
+            let dfa = aset.to_dfa();
+            render_set(&dfa, Path::new(&output));
         }
     };
 }
