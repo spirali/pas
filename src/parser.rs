@@ -1,7 +1,7 @@
 use nom::{IResult};
-use nom::combinator::{map_res, map, opt};
+use nom::combinator::{map_res, map, opt, all_consuming};
 use nom::character::complete::{digit1, alpha1, multispace0};
-use nom::error::VerboseError;
+use nom::error::{VerboseError, convert_error};
 use crate::formula::{Atom, HiFormula};
 use nom::sequence::{preceded, tuple, terminated, delimited};
 use nom::branch::alt;
@@ -9,6 +9,8 @@ use nom::bytes::complete::tag;
 use crate::name::Name;
 use nom::multi::separated_list;
 use crate::formula::{BinOp, HiPredicate};
+
+pub type NomResult<'a, Ret> = IResult<&'a str, Ret, VerboseError<&'a str>>;
 
 pub struct SetDef {
     vars: Vec<Name>,
@@ -26,19 +28,19 @@ impl SetDef {
     }
 }
 
-fn integer(input: &str) -> IResult<&str, u64, VerboseError<&str>>
+fn integer(input: &str) -> NomResult<u64>
 {
     map_res(digit1, |digit_str: &str| {
       digit_str.parse::<u64>()
     })(input)
 }
 
-fn variable(input: &str) -> IResult<&str, String, VerboseError<&str>>
+fn variable(input: &str) -> NomResult<String>
 {
     map(alpha1, |s: &str| s.to_string())(input)
 }
 
-fn atom(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn atom(input: &str) -> NomResult<Atom> {
     alt((
         map(tuple((integer, opt(preceded(tuple((multispace0, tag("*"), multispace0)), variable)))), |r| {
             match r {
@@ -50,15 +52,15 @@ fn atom(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     ))(input)
 }
 
-fn expr(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
+fn expr(input: &str) -> NomResult<Vec<Atom>> {
     separated_list(tuple((multispace0, tag("+"), multispace0)), atom)(input)
 }
 
-fn operator(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+fn operator(input: &str) -> NomResult<&str> {
     alt((tag("=="), tag("<="), tag(">="), tag("<"), tag(">")))(input)
 }
 
-fn predicate(input: &str) -> IResult<&str, HiPredicate, VerboseError<&str>> {
+fn predicate(input: &str) -> NomResult<HiPredicate> {
     map(tuple((expr, delimited(multispace0, operator, multispace0), expr)), |(lhs, op, rhs)| {
         match op {
             "==" => HiPredicate::BinOp(BinOp::Eq, lhs, rhs),
@@ -75,13 +77,13 @@ fn predicate(input: &str) -> IResult<&str, HiPredicate, VerboseError<&str>> {
     map(tuple((multispace0, opt((tag("and"), tag("or"))), multispace0)), |(_, r, _)| r)
 }*/
 
-fn formula0(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
+fn formula0(input: &str) -> NomResult<HiFormula> {
     alt((delimited(tuple((tag("("), multispace0)), formula, tuple((tag(")"), multispace0))),
          map(preceded(tuple((tag("not"), multispace0)), formula0), |f| f.neg()),
          map(terminated(predicate, multispace0), HiFormula::Predicate)))(input)
 }
 
-fn formula1(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
+fn formula1(input: &str) -> NomResult<HiFormula> {
     map(tuple((formula0, opt(preceded(tuple((tag("and"), multispace0)), formula1)))), |r| {
         match r {
             (f, None) => f,
@@ -90,7 +92,7 @@ fn formula1(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
     })(input)
 }
 
-fn formula2(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
+fn formula2(input: &str) -> NomResult<HiFormula> {
     map(tuple((formula1, opt(preceded(tuple((tag("or"), multispace0)), formula2)))), |r| {
         match r {
             (f, None) => f,
@@ -101,20 +103,20 @@ fn formula2(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
 
 /* Top level formula */
 #[inline]
-fn formula(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
+fn formula(input: &str) -> NomResult<HiFormula> {
     formula2(input)
 }
 
-fn varlist(input: &str) -> IResult<&str, Vec<Name>, VerboseError<&str>> {
+fn varlist(input: &str) -> NomResult<Vec<Name>> {
     map(terminated(separated_list(tuple((multispace0, tag(","), multispace0)), variable), multispace0),
         |r| r.iter().map(|x| Name::from_str(x)).collect())(input)
 }
 
-fn setout(input: &str) -> IResult<&str, Vec<Name>, VerboseError<&str>> {
+fn setout(input: &str) -> NomResult<Vec<Name>> {
     terminated(varlist, tuple((multispace0, tag("|"), multispace0)))(input)
 }
 
-pub fn setdef(input: &str) -> IResult<&str, SetDef, VerboseError<&str>> {
+pub fn setdef(input: &str) -> NomResult<SetDef> {
     map(delimited(tuple((tag("{"), multispace0)),
                   tuple((setout, formula)),
                   tuple((tag("}"), multispace0))), |(vars, formula)| {
@@ -132,11 +134,25 @@ pub fn parse_setdef(input: &str) -> SetDef {
     setdef(input).unwrap().1
 }
 
-/*fn named_defset(input: &str) -> IResult<&str, SetDef, VerboseError<&str>> {
+/*fn named_defset(input: &str) -> NomResult<SetDef> {
     map(tuple((variable, tuple((multispace0, tag("="), multispace0)), formula)), |(name, _, f)| {
 
     })(input)
 }*/
+
+pub fn parse_exact<Ret, Parser: Fn(&str) -> NomResult<Ret>>(parser: Parser, input: &str) -> NomResult<Ret> {
+    all_consuming(parser)(input)
+}
+
+pub fn unwrap_nom<'a, Ret>(input: &'a str, result: NomResult<'a, Ret>) -> (&'a str, Ret) {
+    match result {
+        Ok(data) => data,
+        Err(e) => match e {
+            nom::Err::Incomplete(needed) => panic!("Incomplete input"),
+            nom::Err::Error(e) | nom::Err::Failure(e) => panic!(convert_error(input, e))
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -204,5 +220,10 @@ mod test {
         let (_, f) = formula("x <= 10 and 2 < x").unwrap();
         assert_eq!(r2.vars, vec![Name::from_str("x"), Name::from_str("y")]);
         assert_eq!(r2.formula, f);
+    }
+
+    #[test]
+    fn test_parser_exact() {
+        assert!(parse_exact(setdef, "{ x, y | x <= 10 and 2 < x } + 1").is_err());
     }
 }
