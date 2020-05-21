@@ -156,6 +156,12 @@ pub enum Atom {
     Constant(u64),
 }
 
+impl Atom {
+    pub fn from_name(name: Name) -> Self {
+        Self::Variable(name, 1)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum BinOp {
     Eq,
