@@ -28,6 +28,7 @@ enum Command {
         reverse: bool
     },
     Range,
+    IsEmpty
 }
 
 #[derive(Debug, StructOpt)]
@@ -64,5 +65,8 @@ fn main() {
                 println!("{:?}: {}", name, get_max(&nfa, i).to_string());
             }
         },
+        Command::IsEmpty => {
+            println!("Empty: {}", aset.is_empty());
+        }
     };
 }

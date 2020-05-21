@@ -237,6 +237,11 @@ impl AutomaticSet {
     pub fn ensure_dfa(&mut self) {
         self.automaton.ensure_dfa();
     }
+
+    pub fn is_empty(self) -> bool {
+        let dfa = self.to_dfa().minimize();
+        dfa.n_states() == 1 && dfa.accepting().iter().all(|&accepting| !accepting)
+    }
 }
 
 

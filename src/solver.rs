@@ -185,4 +185,10 @@ mod tests {
             assert!(!a.test_input(&[("x", i)]));
         }
     }
+
+    #[test]
+    fn test_eval_is_empty() {
+        let mut a = evaluate_formula(&parse_formula("x < 10 and x > 10").make_lo_formula());
+        assert!(a.is_empty());
+    }
 }
