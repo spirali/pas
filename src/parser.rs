@@ -1,14 +1,15 @@
-use nom::{IResult};
-use nom::combinator::{map_res, map, opt, all_consuming};
-use nom::character::complete::{digit1, alpha1, multispace0};
-use nom::error::{VerboseError, convert_error};
-use crate::formula::{Atom, HiFormula};
-use nom::sequence::{preceded, tuple, terminated, delimited};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use crate::name::Name;
-use nom::multi::separated_list;
+use nom::character::complete::{alpha1, char, digit1, multispace0};
+use nom::combinator::{all_consuming, map, map_res, opt};
+use nom::error::{convert_error, VerboseError};
+use nom::IResult;
+use nom::multi::{fold_many0, separated_list};
+use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+
+use crate::formula::{Atom, HiFormula};
 use crate::formula::{BinOp, HiPredicate};
+use crate::name::Name;
 
 pub type NomResult<'a, Ret> = IResult<&'a str, Ret, VerboseError<&'a str>>;
 
@@ -18,7 +19,6 @@ pub struct SetDef {
 }
 
 impl SetDef {
-
     pub fn vars(&self) -> &[Name] {
         &self.vars
     }
@@ -31,7 +31,7 @@ impl SetDef {
 fn integer(input: &str) -> NomResult<u64>
 {
     map_res(digit1, |digit_str: &str| {
-      digit_str.parse::<u64>()
+        digit_str.parse::<u64>()
     })(input)
 }
 
@@ -77,14 +77,52 @@ fn predicate(input: &str) -> NomResult<HiPredicate> {
     map(tuple((multispace0, opt((tag("and"), tag("or"))), multispace0)), |(_, r, _)| r)
 }*/
 
-fn formula0(input: &str) -> NomResult<HiFormula> {
-    alt((delimited(tuple((tag("("), multispace0)), formula, tuple((tag(")"), multispace0))),
-         map(preceded(tuple((tag("not"), multispace0)), formula0), |f| f.neg()),
-         map(terminated(predicate, multispace0), HiFormula::Predicate)))(input)
+#[derive(Clone, Debug)]
+enum Quantifier {
+    Exists(Name),
+    ForAll(Name),
 }
 
-fn formula1(input: &str) -> NomResult<HiFormula> {
-    map(tuple((formula0, opt(preceded(tuple((tag("and"), multispace0)), formula1)))), |r| {
+fn quantifier(input: &str) -> NomResult<Quantifier> {
+    map(pair(
+        terminated(alt((tag("exists"), tag("forall"))), multispace0),
+        delimited(
+            pair(tag("("), multispace0),
+            variable,
+            pair(tag(")"), multispace0),
+        ),
+    ), |r| {
+        let name = Name::Named(r.1);
+        match r.0 {
+            "exists" => Quantifier::Exists(name),
+            "forall" => Quantifier::ForAll(name),
+            _ => unreachable!()
+        }
+    })(input)
+}
+
+fn quantifiers(input: &str) -> NomResult<Vec<Quantifier>> {
+    fold_many0(quantifier, Vec::new(), |mut acc: Vec<_>, item| {
+        acc.push(item);
+        acc
+    })(input)
+}
+
+fn formula_inner(input: &str) -> NomResult<HiFormula> {
+    alt((
+        map(tuple((quantifiers, delimited(pair(tag("("), multispace0), formula, pair(tag(")"), multispace0)))), |r| {
+            r.0.into_iter().rev().fold(r.1, |acc, item| match item {
+                Quantifier::Exists(name) => HiFormula::Exists(name, Box::new(acc)),
+                Quantifier::ForAll(name) => HiFormula::ForAll(name, Box::new(acc))
+            })
+        }),
+        map(preceded(tuple((tag("not"), multispace0)), formula_inner), |f| f.neg()),
+        map(terminated(predicate, multispace0), HiFormula::Predicate)
+    ))(input)
+}
+
+fn formula_and(input: &str) -> NomResult<HiFormula> {
+    map(tuple((formula_inner, opt(preceded(tuple((tag("and"), multispace0)), formula_and)))), |r| {
         match r {
             (f, None) => f,
             (f, Some(g)) => f.and(g),
@@ -92,8 +130,8 @@ fn formula1(input: &str) -> NomResult<HiFormula> {
     })(input)
 }
 
-fn formula2(input: &str) -> NomResult<HiFormula> {
-    map(tuple((formula1, opt(preceded(tuple((tag("or"), multispace0)), formula2)))), |r| {
+fn formula_or(input: &str) -> NomResult<HiFormula> {
+    map(tuple((formula_and, opt(preceded(tuple((tag("or"), multispace0)), formula_or)))), |r| {
         match r {
             (f, None) => f,
             (f, Some(g)) => f.or(g),
@@ -103,8 +141,8 @@ fn formula2(input: &str) -> NomResult<HiFormula> {
 
 /* Top level formula */
 #[inline]
-fn formula(input: &str) -> NomResult<HiFormula> {
-    formula2(input)
+fn formula(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
+    formula_or(input)
 }
 
 fn varlist(input: &str) -> NomResult<Vec<Name>> {
@@ -121,7 +159,8 @@ pub fn setdef(input: &str) -> NomResult<SetDef> {
                   tuple((setout, formula)),
                   tuple((tag("}"), multispace0))), |(vars, formula)| {
         SetDef {
-            vars, formula
+            vars,
+            formula,
         }
     })(input)
 }
@@ -157,6 +196,7 @@ pub fn unwrap_nom<'a, Ret>(input: &'a str, result: NomResult<'a, Ret>) -> (&'a s
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[test]
     fn parse_integer() {
         assert_eq!(Ok(("", 0)), integer("0"));
@@ -203,7 +243,7 @@ mod test {
 
         let f1 = p1.and(p2);
         let f2 = p3.and(p4);
-        assert_eq!(Ok(("", f1.or(f2))), formula2("x == 4 and 2 * x == 3 * y + 3 or x == y and x == y"));
+        assert_eq!(Ok(("", f1.or(f2))), formula_or("x == 4 and 2 * x == 3 * y + 3 or x == y and x == y"));
 
         let p1 = p("x == 4");
         let p2 = p("2 * x == 3 * y + 3");
@@ -211,7 +251,7 @@ mod test {
         let p4 = p("x == y");
 
         let f1 = p2.or(p3);
-        assert_eq!(Ok(("", p1.and((f1.and(p4))))), formula2("x == 4 and (2 * x == 3 * y + 3 or x == y) and x == y"));
+        assert_eq!(Ok(("", p1.and((f1.and(p4))))), formula_or("x == 4 and (2 * x == 3 * y + 3 or x == y) and x == y"));
     }
 
     #[test]
@@ -225,5 +265,19 @@ mod test {
     #[test]
     fn test_parser_exact() {
         assert!(parse_exact(setdef, "{ x, y | x <= 10 and 2 < x } + 1").is_err());
+    }
+
+    #[test]
+    fn test_parser_quantifiers() {
+        let (_, f) = formula("forall(x) exists(y) (x < y)").unwrap();
+        let x = String::from("x");
+        let y = String::from("y");
+        let exists = Box::new(HiFormula::Exists(Name::Named(y.clone()), Box::new(HiFormula::Predicate(
+            HiPredicate::BinOp(BinOp::Lt,
+                               vec!(Atom::from_name(Name::new(x.clone()))),
+                               vec!(Atom::from_name(Name::new(y))),
+            ))
+        )));
+        assert_eq!(f, HiFormula::ForAll(Name::Named(x), exists));
     }
 }
