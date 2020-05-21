@@ -239,8 +239,8 @@ impl AutomaticSet {
     }
 
     pub fn is_empty(self) -> bool {
-        let dfa = self.to_dfa().minimize();
-        dfa.n_states() == 1 && dfa.accepting().iter().all(|&accepting| !accepting)
+        let dfa = self.to_dfa();
+        dfa.n_states() == 1 && !dfa.is_accepting(0)
     }
 }
 

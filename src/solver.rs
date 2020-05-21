@@ -191,4 +191,10 @@ mod tests {
         let mut a = evaluate_formula(&parse_formula("x < 10 and x > 10").make_lo_formula());
         assert!(a.is_empty());
     }
+
+    #[test]
+    fn test_eval_is_not_empty() {
+        let mut a = evaluate_formula(&parse_formula("x < 10 and x > 5").make_lo_formula());
+        assert!(!a.is_empty());
+    }
 }
