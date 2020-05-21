@@ -14,7 +14,7 @@ use structopt::StructOpt;
 use std::path::Path;
 use crate::aset::AutomaticSet;
 use std::fs;
-use crate::parser::setdef;
+use crate::parser::{setdef, parse_exact, unwrap_nom};
 use crate::solver::build_set;
 use crate::words::get_max;
 
@@ -38,11 +38,10 @@ struct Opts {
     command: Command,
 }
 
-
 fn read_file(path: &Path) -> AutomaticSet {
     let content = fs::read_to_string(path).unwrap();
-    let (rest, sdef) = setdef(&content).unwrap();
-    assert_eq!(rest, "");
+    let input = content.trim();
+    let (_, sdef) = unwrap_nom(input, parse_exact(setdef, input));
     build_set(&sdef)
 }
 
