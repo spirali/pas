@@ -208,6 +208,7 @@ dependencies = [
  "itertools",
  "nom",
  "png",
+ "reduce",
  "smallvec",
  "structopt",
 ]
@@ -267,6 +268,12 @@ checksum = "42934bc9c8ab0d3b273a16d8551c8f0fcff46be73276ca083ec2414c15c4ba5e"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "reduce"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75b1fa5668b02f2a69746bba558f8f98cc087b123a587fd959122872ad9a3f3c"
 
 [[package]]
 name = "rustc_version"

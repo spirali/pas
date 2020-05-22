@@ -72,6 +72,10 @@ impl Nfa {
         return init
     }
 
+    pub fn to_dfa(&self) -> Dfa {
+        self.determinize().minimize()
+    }
+
     #[inline]
     pub fn initial_states(&self) -> &HashSet<StateId> {
         &self.initial_states

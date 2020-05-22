@@ -4,6 +4,8 @@ use crate::common::{StateId};
 use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
 use crate::words::Bound::Finite;
+use reduce::Reduce;
+
 
 pub fn iterate_words<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>, mut callback: F) {
     if let Some(0) = limit {
@@ -25,7 +27,7 @@ pub fn iterate_words<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>, mu
 
     tracks.resize(n_tracks, 0);
 
-    dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
+    //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
 
     fn push(tracks: &mut Vec<usize>, symbol: usize) {
         for (i, t) in tracks.iter_mut().enumerate() {
@@ -339,6 +341,66 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
     output
 }
 
+pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
+{
+    //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
+    let mut output = vec![None; dfa.n_states()];
+    let mut remaining = vec![dfa.alphabet_size(); dfa.n_states()];
+    let r_table = dfa.reverse_table();
+    let mut s_next = Vec::<StateId>::with_capacity(dfa.n_states());
+
+    let mut process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
+        for s2 in r_table.get_state(state_id) {
+            for s3 in &s2.states {
+                if remaining[*s3 as usize] <= 1 {
+                    assert_eq!(remaining[*s3 as usize], 1);
+                    s_next.push(*s3);
+                    remaining[*s3 as usize] = 0;
+                } else {
+                    remaining[*s3 as usize] -= 1;
+                }
+            }
+        }
+    };
+
+    for (i, (s, a)) in dfa.states().enumerate() {
+        let state = i as StateId;
+        if !a && s.iter().all(|x| *x == state) {
+            output[i] = Some(0);
+            remaining[i] += 1; // To prevent it rerunning process again
+            dbg!("S", &remaining);
+            process(state, &mut s_next, &mut remaining);
+            dbg!("X", &remaining);
+        }
+    }
+
+    let mut s_current = Vec::<StateId>::with_capacity(dfa.n_states());
+    dbg!(&s_next, &remaining);
+    while !s_next.is_empty() {
+        std::mem::swap(&mut s_current, &mut s_next);
+        s_next.clear();
+        for s in &s_current {
+            let mut size : usize = dfa.get_state(*s).iter().map(|c| output[*c as usize].unwrap()).sum();
+            if dfa.is_accepting(*s) {
+                size += 1;
+            }
+            output[*s as usize] = Some(size);
+            process(*s, &mut s_next, &mut remaining);
+        }
+    }
+
+    output
+}
+
+pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
+{
+    let dfa = dfa.reverse().to_dfa();
+    let number_of_words = number_of_words(&dfa);
+    let transitions = dfa.get_state(0);
+    let count = (1..dfa.alphabet_size()).into_iter().filter_map(|a| number_of_words[transitions[a] as usize]).reduce(|a,b| a + b);
+    count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
+}
+
 pub fn shortest_words(dfa: &Dfa) -> Vec<Option<usize>>
 {
     let mut output = vec![None; dfa.n_states()];
@@ -528,5 +590,23 @@ mod tests {
 
         let a = build_set(&parse_setdef("{ x | x == 72300 or x == 23 or x > 512}")).to_nfa();
         assert_eq!(get_max(&a, 0), Bound::Infinite);
+    }
+
+    #[test]
+    fn test_size() {
+        let a = build_set(&parse_setdef("{ x | x == 1}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(1));
+        let a = build_set(&parse_setdef("{ x | x == 0}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(1));
+        let a = build_set(&parse_setdef("{ x | not (x == x)}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(0));
+        let a = build_set(&parse_setdef("{ x | x < 10}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(10));
+        let a = build_set(&parse_setdef("{ x | x < 10 and not x == 1}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(9));
+        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(10000));
+        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100 and not (x == y) or (x == 123 and y == 321)}")).to_nfa();
+        assert_eq!(number_of_elements(&a.to_dfa()), Some(9901));
     }
 }

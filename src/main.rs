@@ -32,7 +32,6 @@ enum Command {
     Render {
         output: String,
     },
-    Range,
     Stats,
     IsEmpty
 }
