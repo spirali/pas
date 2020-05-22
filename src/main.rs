@@ -33,6 +33,7 @@ enum Command {
         output: String,
     },
     Range,
+    Stats,
     IsEmpty
 }
 
@@ -63,9 +64,11 @@ fn main() {
             };
             nfa.write_dot(Path::new(&output), !with_sink).unwrap()
         },
-        Command::Range => {
+        Command::Stats => {
             let names = aset.track_names().to_vec();
-            let nfa = aset.to_nfa();
+            let dfa = aset.to_dfa();
+            println!("DFA size: {}", dfa.n_states());
+            let nfa = dfa.to_nfa();
             for (i, name) in names.iter().enumerate() {
                 println!("{:?}: {}", name, get_max(&nfa, i).to_string());
             }
