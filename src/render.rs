@@ -1,5 +1,5 @@
 use crate::aset::AutomaticSet;
-use crate::words::{get_max, iterate_words};
+use crate::elements::{get_max_value, iterate_elements};
 use std::fs::File;
 use std::io::BufWriter;
 use crate::dfa::Dfa;
@@ -7,11 +7,11 @@ use crate::dfa::Dfa;
 pub fn render_set(dfa: &Dfa, path: &std::path::Path) {
     assert_eq!(dfa.n_tracks(), 2);
     let nfa = dfa.clone().to_nfa();
-    let size_x = get_max(&nfa, 0).to_limit().unwrap();
-    let size_y = get_max(&nfa, 1).to_limit().unwrap();
+    let size_x = get_max_value(&nfa, 0).to_limit().unwrap();
+    let size_y = get_max_value(&nfa, 1).to_limit().unwrap();
 
     let mut data : Vec<u8> = vec![0u8; 3 * size_x * size_y];
-    iterate_words(&dfa, None, |output| {
+    iterate_elements(&dfa, None, |output| {
        let idx = 3 * (output[1] * size_x + output[0]);
        data[idx] = 255;
     });

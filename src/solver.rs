@@ -49,7 +49,6 @@ mod tests {
     use super::*;
     use crate::parser::parse_formula;
     use crate::name::Name;
-    use crate::words::iterate_words;
 
     #[test]
     fn test_eval_eq_formula() {
