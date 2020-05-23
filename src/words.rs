@@ -47,18 +47,16 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
 {
     let mut output = vec![Bound::Infinite; dfa.n_states()];
     let mut remaining = vec![dfa.alphabet_size(); dfa.n_states()];
-    let r_table = dfa.reverse_table();
+    let r_table = dfa.reverse_reachability();
     let mut s_next = Vec::<StateId>::with_capacity(dfa.n_states());
 
     let mut process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
-        for s2 in r_table.get_state(state_id) {
-            for s3 in &s2.states {
-                if remaining[*s3 as usize] <= 1 {
-                    assert_eq!(remaining[*s3 as usize], 1);
-                    s_next.push(*s3);
-                } else {
-                    remaining[*s3 as usize] -= 1;
-                }
+        for s3 in &r_table[state_id as usize] {
+            if remaining[*s3 as usize] <= 1 {
+                assert_eq!(remaining[*s3 as usize], 1);
+                s_next.push(*s3);
+            } else {
+                remaining[*s3 as usize] -= 1;
             }
         }
     };
@@ -94,19 +92,17 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
     //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
     let mut output = vec![None; dfa.n_states()];
     let mut remaining = vec![dfa.alphabet_size(); dfa.n_states()];
-    let r_table = dfa.reverse_table();
+    let r_table = dfa.reverse_reachability();
     let mut s_next = Vec::<StateId>::with_capacity(dfa.n_states());
 
     let mut process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
-        for s2 in r_table.get_state(state_id) {
-            for s3 in &s2.states {
-                if remaining[*s3 as usize] <= 1 {
-                    assert_eq!(remaining[*s3 as usize], 1);
-                    s_next.push(*s3);
-                    remaining[*s3 as usize] = 0;
-                } else {
-                    remaining[*s3 as usize] -= 1;
-                }
+        for s3 in &r_table[state_id as usize] {
+            if remaining[*s3 as usize] <= 1 {
+                assert_eq!(remaining[*s3 as usize], 1);
+                s_next.push(*s3);
+                remaining[*s3 as usize] = 0;
+            } else {
+                remaining[*s3 as usize] -= 1;
             }
         }
     };
@@ -167,6 +163,14 @@ pub fn shortest_words(dfa: &Dfa) -> Vec<Option<usize>>
         step += 1;
     }
     output
+}
+
+pub fn number_of_words_zero_length(dfa: &Dfa) -> Vec<usize> {
+    dfa.accepting().iter().map(|a| if *a { 1 } else { 0 }).collect()
+}
+
+pub fn number_of_words_n_length(dfa: &Dfa, prev: &Vec<usize>, out: &mut Vec<usize>) {
+
 }
 
 

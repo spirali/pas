@@ -105,6 +105,18 @@ impl Dfa {
         table
     }
 
+    pub fn reverse_reachability(&self) -> Vec<Vec<StateId>>
+    {
+        let mut output = Vec::new();
+        output.resize(self.table.size(), Vec::new());
+        for (idx, state) in self.table.states().enumerate() {
+            for t in state.iter() {
+                output[*t as usize].push(idx as StateId);
+            }
+        }
+        output
+    }
+
     pub fn reverse(&self) -> Nfa {
         let table = self.reverse_table();
 
