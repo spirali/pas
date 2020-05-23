@@ -13,6 +13,7 @@ use crate::name::Name;
 
 pub type NomResult<'a, Ret> = IResult<&'a str, Ret, VerboseError<&'a str>>;
 
+#[derive(Debug)]
 pub struct SetDef {
     vars: Vec<Name>,
     formula: HiFormula,

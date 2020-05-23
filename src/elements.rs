@@ -1,15 +1,28 @@
-use crate::words::{number_of_words, shortest_words, longest_words, Bound};
+use crate::words::{number_of_words, shortest_words, longest_words, Bound, number_of_words_zero_length, number_of_words_next_length};
 use crate::dfa::Dfa;
 use reduce::Reduce;
 use crate::nfa::Nfa;
 use crate::common::StateId;
+
+fn push_tracks(tracks: &mut Vec<usize>, symbol: usize) {
+    for (i, t) in tracks.iter_mut().enumerate() {
+        *t <<= 1;
+        *t |= (symbol >> i) & 1;
+    }
+}
+
+fn pop_tracks(tracks: &mut Vec<usize>) {
+    for t in tracks.iter_mut() {
+        *t >>= 1;
+    }
+}
 
 pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
 {
     let dfa = dfa.reverse().to_dfa();
     let number_of_words = number_of_words(&dfa);
     let transitions = dfa.get_state(0);
-    let count = (1..dfa.alphabet_size()).into_iter().filter_map(|a| number_of_words[transitions[a] as usize]).reduce(|a,b| a + b);
+    let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).reduce(|a,b| a + b);
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
 
@@ -18,7 +31,7 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
         return;
     }
 
-    let dfa = dfa.reverse().determinize().minimize();
+    let dfa = dfa.reverse().to_dfa();
 
     let n_tracks = dfa.n_tracks();
     if n_tracks == 0 {
@@ -34,19 +47,6 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
     tracks.resize(n_tracks, 0);
 
     //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
-
-    fn push(tracks: &mut Vec<usize>, symbol: usize) {
-        for (i, t) in tracks.iter_mut().enumerate() {
-            *t <<= 1;
-            *t |= (symbol >> i) & 1;
-        }
-    }
-
-    fn pop(tracks: &mut Vec<usize>) {
-        for (i, t) in tracks.iter_mut().enumerate() {
-            *t >>= 1;
-        }
-    }
 
     struct ComputationDef {
         dfa: Dfa,
@@ -104,11 +104,11 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
                 Bound::Finite(x) if new_length > x => continue,
                 _ => { /* Do nothing */ }
             };
-            push(&mut c_state.tracks, a);
+            push_tracks(&mut c_state.tracks, a);
             if compute(c_def, c_state, new_state, new_length) {
                 return true;
             }
-            pop(&mut c_state.tracks);
+            pop_tracks(&mut c_state.tracks);
         }
         return false;
     }
@@ -122,7 +122,7 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
             for t in c_state.tracks.iter_mut() {
                 *t = 0;
             }
-            push(&mut c_state.tracks, a);
+            push_tracks(&mut c_state.tracks, a);
             let new_state = c_def.dfa.get_state(0)[a];
             if Bound::Finite(length - 1) <= c_def.long[new_state as usize] {
                 finished = false;
@@ -177,6 +177,71 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     } else {
         max
     }
+}
+
+
+pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
+    let mut tracks = vec![0; dfa.n_tracks()];
+    if dfa.is_accepting(0) {
+        if nth_element == 0 {
+            /* Handle special case */
+            return tracks;
+        }
+        nth_element -= 1;
+    }
+
+    let dfa = dfa.reverse().to_dfa();
+
+    let mut target_len = 0;
+    let mut lengths = vec![number_of_words_zero_length(&dfa)];
+
+    let transitions = dfa.get_state(0);
+    let mut remaining = nth_element;
+    let mut sym = 0;
+
+    loop {
+        let lens = &lengths[lengths.len() - 1];
+        for (i, tr) in transitions[1..].iter().enumerate() {
+            let len = lens[*tr as usize];
+            if remaining < len {
+                sym = i + 1;
+                break;
+            }
+            remaining -= len;
+        }
+        if sym != 0 {
+            break;
+        }
+        assert!(lengths.len() < 64);
+        /*let count : usize = transitions[1..].iter().map(|s| lengths[target_len][*s as usize]).sum();
+        if remaining < count {
+            break;
+        } else {
+            remaining -= count;
+        }*/
+        lengths.push(number_of_words_next_length(&dfa, &lengths[target_len]));
+        target_len += 1;
+    }
+
+    push_tracks(&mut tracks, sym);
+    let mut state = dfa.get_state(0)[sym];
+    lengths.pop();
+
+    for lens in lengths.iter().rev() {
+        let mut found = false;
+        for (i, tr) in dfa.get_state(state).iter().enumerate() {
+            let len = lens[*tr as usize];
+            if remaining < len {
+                push_tracks(&mut tracks, i);
+                state = dfa.get_state(state)[i];
+                found = true;
+                break;
+            }
+            remaining -= len;
+        }
+        debug_assert!(found);
+    }
+    tracks
 }
 
 
@@ -237,7 +302,7 @@ mod tests {
         let a = build_set(&parse_setdef("{ x | x == 314 or x == 25 }")).to_dfa();
         assert_eq!(collect_elements(&a, Some(2)), vec![vec![25], vec![314]]);
     }
-    
+
     #[test]
     fn test_range() {
         let a = build_set(&parse_setdef("{ x, y | x == 10}")).to_nfa();
@@ -279,5 +344,42 @@ mod tests {
         assert_eq!(number_of_elements(&a.to_dfa()), Some(10000));
         let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100 and not (x == y) or (x == 123 and y == 321)}")).to_nfa();
         assert_eq!(number_of_elements(&a.to_dfa()), Some(9901));
+    }
+
+    #[test]
+    fn test_nth_element() {
+        let a = build_set(&parse_setdef("{ x | x == 0}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![0]);
+
+        let a = build_set(&parse_setdef("{ x | x == 1}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![1]);
+
+        let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![1]);
+        assert_eq!(get_nth_element(&a, 1), vec![3]);
+
+        let a = build_set(&parse_setdef("{ x | x < 10}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![0]);
+        assert_eq!(get_nth_element(&a, 1), vec![1]);
+        assert_eq!(get_nth_element(&a, 2), vec![2]);
+        assert_eq!(get_nth_element(&a, 9), vec![9]);
+
+        let a = build_set(&parse_setdef("{ x | x > 55}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![56]);
+        assert_eq!(get_nth_element(&a, 1), vec![57]);
+        assert_eq!(get_nth_element(&a, 2), vec![58]);
+        assert_eq!(get_nth_element(&a, 12077), vec![56 + 12077]);
+
+        let a = build_set(&parse_setdef("{ x | 111 * y == x and x > 100 and (not exists(z)(2 * z == x))}")).to_dfa();
+
+        assert_eq!(get_nth_element(&a, 0), vec![111]);
+        assert_eq!(get_nth_element(&a, 1), vec![333]);
+        assert_eq!(get_nth_element(&a, 2), vec![555]);
+
+        let a = build_set(&parse_setdef("{ x, y | x == y + 1}")).to_dfa();
+        assert_eq!(get_nth_element(&a, 0), vec![1, 0]);
+        assert_eq!(get_nth_element(&a, 1), vec![2, 1]);
+        assert_eq!(get_nth_element(&a, 2), vec![3, 2]);
+        assert_eq!(get_nth_element(&a, 7001), vec![7002, 7001]);
     }
 }

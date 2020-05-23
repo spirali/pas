@@ -57,8 +57,13 @@ impl Dfa {
     }
 
     #[inline]
-    pub fn states(&self) -> impl Iterator<Item=(&[StateId], bool)> {
+    pub fn states_and_acc(&self) -> impl Iterator<Item=(&[StateId], bool)> {
         self.table.states().zip(self.accepting.iter().copied())
+    }
+
+    #[inline]
+    pub fn states(&self) -> impl Iterator<Item=&[StateId]> {
+        self.table.states()
     }
 
     #[inline]

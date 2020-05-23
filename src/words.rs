@@ -61,7 +61,7 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         }
     };
 
-    for (i, (s, a)) in dfa.states().enumerate() {
+    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
         let state = i as StateId;
         if !a && s.iter().all(|x| *x == state) {
             output[i] = Bound::None;
@@ -107,7 +107,7 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
         }
     };
 
-    for (i, (s, a)) in dfa.states().enumerate() {
+    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
         let state = i as StateId;
         if !a && s.iter().all(|x| *x == state) {
             output[i] = Some(0);
@@ -142,7 +142,7 @@ pub fn shortest_words(dfa: &Dfa) -> Vec<Option<usize>>
     let mut n_next = HashSet::<StateId>::with_capacity(dfa.n_states());
     let mut reverse = vec![Vec::<StateId>::new(); dfa.n_states()];
 
-    for (i, (s, a)) in dfa.states().enumerate() {
+    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
         let state_id = i as StateId;
         for t in s {
             reverse[*t as usize].push(state_id);
@@ -169,10 +169,11 @@ pub fn number_of_words_zero_length(dfa: &Dfa) -> Vec<usize> {
     dfa.accepting().iter().map(|a| if *a { 1 } else { 0 }).collect()
 }
 
-pub fn number_of_words_n_length(dfa: &Dfa, prev: &Vec<usize>, out: &mut Vec<usize>) {
-
+pub fn number_of_words_next_length(dfa: &Dfa, prev: &Vec<usize>) -> Vec<usize> {
+    dfa.states().map(|s| {
+        s.iter().map(|t| prev[*t as usize]).sum()
+    }).collect()
 }
-
 
 #[cfg(test)]
 mod tests {
