@@ -24,7 +24,7 @@ impl Element {
         1 << self.values.len()
     }
 
-    pub fn n_tracks(self) -> usize {
+    pub fn n_tracks(&self) -> usize {
         self.values.len()
     }
 
@@ -35,16 +35,49 @@ impl Element {
         }
     }
 
+    pub fn set_symbol(&mut self, symbol: usize) {
+        for (i, t) in self.values.iter_mut().enumerate() {
+            *t = (symbol >> i) & 1;
+        }
+    }
+
     pub fn pop_symbol(&mut self) {
         for t in self.values.iter_mut() {
             *t >>= 1;
         }
     }
+
+    pub fn reset(&mut self) {
+        for t in self.values.iter_mut() {
+            *t = 0;
+        }
+    }
+
+    pub fn get_symbol(&self, position: usize) -> usize {
+        let mut sym = 0;
+        for v in &self.values {
+            sym += (*v >> position) & 1;
+        }
+        sym
+    }
+
+    pub fn length(&self) -> usize {
+        self.values.iter().map(|x| std::mem::size_of_val(x) * 8 - x.leading_zeros() as usize).max().unwrap()
+    }
+
+    pub fn into_vec(self) -> Vec<usize> {
+        self.values
+    }
+
+    #[inline]
+    pub fn as_slice(&self) -> &[usize] {
+        self.values.as_slice()
+    }
 }
 
 
 
-fn push_tracks(tracks: &mut Vec<usize>, symbol: usize) {
+/*fn push_tracks(tracks: &mut Vec<usize>, symbol: usize) {
     for (i, t) in tracks.iter_mut().enumerate() {
         *t <<= 1;
         *t |= (symbol >> i) & 1;
@@ -55,7 +88,7 @@ fn pop_tracks(tracks: &mut Vec<usize>) {
     for t in tracks.iter_mut() {
         *t >>= 1;
     }
-}
+}*/
 
 pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
 {
@@ -66,7 +99,7 @@ pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
 
-pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>, mut callback: F) {
+pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>, mut callback: F) {
     if let Some(0) = limit {
         return;
     }
@@ -82,9 +115,7 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
     let long = longest_words(&dfa);
 
     //let mut stack = Vec::new();
-    let mut tracks = Vec::new();
-
-    tracks.resize(n_tracks, 0);
+    let mut element = Element::new(dfa.n_tracks());
 
     //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
 
@@ -100,30 +131,30 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
         long,
     };
 
-    struct ComputationState<F: FnMut(&[usize])> {
-        tracks: Vec<usize>,
+    struct ComputationState<F: FnMut(&Element)> {
+        element: Element,
         limit: Option<usize>,
         callback: F,
     };
 
     let mut c_state = ComputationState {
         callback,
-        tracks,
+        element,
         limit,
     };
 
     if c_def.dfa.is_accepting(0) {
-        (c_state.callback)(c_state.tracks.as_slice());
+        (c_state.callback)(&c_state.element);
         c_state.limit.as_mut().map(|v| *v -= 1);
         if let Some(0) = c_state.limit {
             return;
         }
     }
 
-    fn compute<F: FnMut(&[usize])>(c_def: &ComputationDef, c_state: &mut ComputationState<F>, state: StateId, length: usize) -> bool {
+    fn compute<F: FnMut(&Element)>(c_def: &ComputationDef, c_state: &mut ComputationState<F>, state: StateId, length: usize) -> bool {
         if length == 0 {
             if c_def.dfa.is_accepting(state) {
-                (c_state.callback)(c_state.tracks.as_slice());
+                (c_state.callback)(&c_state.element);
                 c_state.limit.as_mut().map(|v| *v -= 1);
                 if let Some(0) = c_state.limit {
                     return true;
@@ -144,11 +175,11 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
                 Bound::Finite(x) if new_length > x => continue,
                 _ => { /* Do nothing */ }
             };
-            push_tracks(&mut c_state.tracks, a);
+            c_state.element.push_symbol(a);
             if compute(c_def, c_state, new_state, new_length) {
                 return true;
             }
-            pop_tracks(&mut c_state.tracks);
+            c_state.element.pop_symbol();
         }
         return false;
     }
@@ -159,10 +190,7 @@ pub fn iterate_elements<F: FnMut(&[usize])>(dfa: &Dfa, mut limit: Option<usize>,
         let mut finished = true;
 
         for a in 1..asize /* 1 is correct here! */ {
-            for t in c_state.tracks.iter_mut() {
-                *t = 0;
-            }
-            push_tracks(&mut c_state.tracks, a);
+            c_state.element.set_symbol(a);
             let new_state = c_def.dfa.get_state(0)[a];
             if Bound::Finite(length - 1) <= c_def.long[new_state as usize] {
                 finished = false;
@@ -219,40 +247,63 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     }
 }
 
-pub fn cut(a_size: usize, values: Vec<usize>) -> Nfa {
+pub fn cut(element: &Element) -> Nfa {
     let mut data = vec![];
 
-    let length = values.iter().map(|x| std::mem::size_of_val(x) - x.leading_zeros() as usize).max().unwrap();
-    for i in (0..length).rev() {
-        let mut sym = 0;
-        for v in values {
-            sym += (*v >> i) & 1;
+    let length = element.length();
+    let a_size = element.alphabet_size();
+
+    for i in (0..length) {
+        let sym = element.get_symbol(length - i - 1);
+        let j = i + 1;
+
+        for _ in 0..sym {
+            data.push(Transition::simple((j * 3 + 1) as StateId));
         }
-        for _ in 0..sym + 1 {
-            data.push(Transition::simple((i + 1) as StateId));
+
+        data.push(Transition::simple((j * 3) as StateId));
+
+        for _ in (sym + 1)..a_size {
+            data.push(Transition::simple((j * 3 + 2) as StateId));
         }
-        for _ in sym + 1..a_size {
-            data.push(Transition::simple((length + 1) as StateId));
+
+        for _ in 0..a_size {
+            data.push(Transition::simple((j * 3 + 1) as StateId));
+        }
+
+        for _ in 0..a_size {
+            data.push(Transition::simple((j * 3 + 2) as StateId));
         }
     }
 
-    for _ in 0..a_size {
-        data.push(Transition::simple((length + 1) as StateId)); /* Self loop */
+    for _ in 0..a_size * 3 {
+        data.push(Transition::simple((length * 3 + 2) as StateId));
     }
 
-    let mut accepting = vec![true; length + 2];
-    accepting[length + 1] = false;
+    data[0].states.push(0);
 
-    let nfa = Nfa::new(TransitionTable::new(values.len(), data), accepting, Nfa::simple_init());
+    let mut accepting = vec![true; (length + 1) * 3];
+    let last = accepting.len() - 1;
+    accepting[last] = false;
+
+    dbg!(accepting.len(), data.len());
+
+    dbg!(&data);
+
+    let nfa = Nfa::new(TransitionTable::new(element.n_tracks(), data), accepting, Nfa::simple_init());
+    nfa.write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
+    nfa.to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
+    nfa.to_dfa().reverse().to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
     nfa.to_dfa().reverse()
+
 }
 
-pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
-    let mut tracks = vec![0; dfa.n_tracks()];
+pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
+    let mut element = Element::new(dfa.n_tracks());
     if dfa.is_accepting(0) {
         if nth_element == 0 {
             /* Handle special case */
-            return tracks;
+            return element;
         }
         nth_element -= 1;
     }
@@ -290,7 +341,7 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
         target_len += 1;
     }
 
-    push_tracks(&mut tracks, sym);
+    element.push_symbol(sym);
     let mut state = dfa.get_state(0)[sym];
     lengths.pop();
 
@@ -299,7 +350,7 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
         for (i, tr) in dfa.get_state(state).iter().enumerate() {
             let len = lens[*tr as usize];
             if remaining < len {
-                push_tracks(&mut tracks, i);
+                element.push_symbol(i);
                 state = dfa.get_state(state)[i];
                 found = true;
                 break;
@@ -308,7 +359,7 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
         }
         debug_assert!(found);
     }
-    tracks
+    element
 }
 
 
@@ -323,7 +374,7 @@ mod tests {
 
     fn collect_elements(dfa: &Dfa, limit: Option<usize>) -> Vec<Vec<usize>> {
         let mut result = Vec::new();
-        iterate_elements(dfa, limit, |w| result.push(w.to_vec()));
+        iterate_elements(dfa, limit, |w| result.push(w.as_slice().to_vec()));
         result
     }
 
@@ -416,37 +467,37 @@ mod tests {
     #[test]
     fn test_nth_element() {
         let a = build_set(&parse_setdef("{ x | x == 0}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![0]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![0]);
 
         let a = build_set(&parse_setdef("{ x | x == 1}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![1]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1]);
 
         let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![1]);
-        assert_eq!(get_nth_element(&a, 1), vec![3]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1]);
+        assert_eq!(get_nth_element(&a, 1).into_vec(), vec![3]);
 
         let a = build_set(&parse_setdef("{ x | x < 10}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![0]);
-        assert_eq!(get_nth_element(&a, 1), vec![1]);
-        assert_eq!(get_nth_element(&a, 2), vec![2]);
-        assert_eq!(get_nth_element(&a, 9), vec![9]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![0]);
+        assert_eq!(get_nth_element(&a, 1).into_vec(), vec![1]);
+        assert_eq!(get_nth_element(&a, 2).into_vec(), vec![2]);
+        assert_eq!(get_nth_element(&a, 9).into_vec(), vec![9]);
 
         let a = build_set(&parse_setdef("{ x | x > 55}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![56]);
-        assert_eq!(get_nth_element(&a, 1), vec![57]);
-        assert_eq!(get_nth_element(&a, 2), vec![58]);
-        assert_eq!(get_nth_element(&a, 12077), vec![56 + 12077]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![56]);
+        assert_eq!(get_nth_element(&a, 1).into_vec(), vec![57]);
+        assert_eq!(get_nth_element(&a, 2).into_vec(), vec![58]);
+        assert_eq!(get_nth_element(&a, 12077).into_vec(), vec![56 + 12077]);
 
         let a = build_set(&parse_setdef("{ x | 111 * y == x and x > 100 and (not exists(z)(2 * z == x))}")).to_dfa();
 
-        assert_eq!(get_nth_element(&a, 0), vec![111]);
-        assert_eq!(get_nth_element(&a, 1), vec![333]);
-        assert_eq!(get_nth_element(&a, 2), vec![555]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![111]);
+        assert_eq!(get_nth_element(&a, 1).into_vec(), vec![333]);
+        assert_eq!(get_nth_element(&a, 2).into_vec(), vec![555]);
 
         let a = build_set(&parse_setdef("{ x, y | x == y + 1}")).to_dfa();
-        assert_eq!(get_nth_element(&a, 0), vec![1, 0]);
-        assert_eq!(get_nth_element(&a, 1), vec![2, 1]);
-        assert_eq!(get_nth_element(&a, 2), vec![3, 2]);
-        assert_eq!(get_nth_element(&a, 7001), vec![7002, 7001]);
+        assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1, 0]);
+        assert_eq!(get_nth_element(&a, 1).into_vec(), vec![2, 1]);
+        assert_eq!(get_nth_element(&a, 2).into_vec(), vec![3, 2]);
+        assert_eq!(get_nth_element(&a, 7001).into_vec(), vec![7002, 7001]);
     }
 }

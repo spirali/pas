@@ -5,6 +5,7 @@ use crate::dfa::Dfa;
 use crate::name::Name;
 use hashbrown::HashMap;
 use crate::common::StateId;
+use crate::elements::{Element, cut, get_nth_element};
 
 #[derive(Debug, Clone)]
 pub struct AutomaticSet {
@@ -97,12 +98,27 @@ impl AutomaticSet {
         }
     }
 
-    pub fn cut(&self, values: &Vec<usize>) -> AutomaticSet {
-        assert_eq!(values.len(), self.track_names.len());
-        cut(values)
+    pub fn cut(&self, nth_element: usize, lte: bool) -> AutomaticSet {
+        let self_dfa = self.automaton.as_dfa();
+        let element = get_nth_element(&self_dfa, nth_element);
+        assert_eq!(element.n_tracks(), self.track_names.len());
 
-        let mut nfa = self.automaton.clone().to_dfa().neg().to_nfa();
-        nfa.join(&nfa.to_dfa().neg().to_nfa());
+        dbg!(&element);
+
+        let cut_nfa = cut(&element);
+
+        //dbg!(&cut_nfa.to_dfa());
+
+        /*return AutomaticSet {
+            track_names: self.track_names.to_vec(),
+            automaton: Automaton::Dfa(cut_nfa.to_dfa()),
+        };*/
+        //dbg!(&cut_nfa.to_dfa());
+
+        let neg_cut_nfa = cut_nfa.to_dfa().neg().to_nfa();
+
+        let mut nfa = self_dfa.neg().to_nfa();
+        nfa.join(&neg_cut_nfa);
         let dfa = nfa.to_dfa().neg();
 
         AutomaticSet {
@@ -263,6 +279,15 @@ impl AutomaticSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::solver::build_set;
+    use crate::parser::parse_setdef;
+    use crate::elements::iterate_elements;
+
+    fn collect_elements(dfa: &Dfa, limit: Option<usize>) -> Vec<Vec<usize>> {
+        let mut result = Vec::new();
+        iterate_elements(dfa, limit, |w| result.push(w.as_slice().to_vec()));
+        result
+    }
 
     fn number_to_word(mut number: usize) -> Vec<usize> {
         let mut r = Vec::new();
@@ -338,4 +363,18 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_cut() {
+        let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}"));
+        assert_eq!(collect_elements(&a.cut(0, true).to_dfa(), None), vec![vec![1]]);
+        assert_eq!(collect_elements(&a.cut(1, true).to_dfa(), None), vec![vec![1], vec![3]]);
+
+        let a = build_set(&parse_setdef("{ x | x > 5 and x < 20 and 2 * y == x}"));
+        assert_eq!(collect_elements(&a.cut(3, true).to_dfa(), None), vec![vec![6], vec![8], vec![10], vec![12]]);
+
+        let a = build_set(&parse_setdef("{ x, y | x == y + 13 or x == y + 11}"));
+        assert_eq!(collect_elements(&a.cut(5, true).to_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2]]);
+    }
+
 }

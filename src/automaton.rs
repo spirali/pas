@@ -19,7 +19,14 @@ impl Automaton {
     pub fn to_dfa(self) -> Dfa {
         match self {
             Self::Dfa(dfa) => dfa,
-            Self::Nfa(nfa) => nfa.determinize().minimize(),
+            Self::Nfa(nfa) => nfa.to_dfa(),
+        }
+    }
+
+    pub fn as_dfa(&self) -> Dfa {
+            match self {
+            Self::Dfa(dfa) => dfa.clone(),
+            Self::Nfa(nfa) => nfa.to_dfa(),
         }
     }
 

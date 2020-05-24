@@ -11,8 +11,9 @@ pub fn render_set(dfa: &Dfa, path: &std::path::Path) {
     let size_y = get_max_value(&nfa, 1).to_limit().unwrap();
 
     let mut data : Vec<u8> = vec![0u8; 3 * size_x * size_y];
-    iterate_elements(&dfa, None, |output| {
-       let idx = 3 * (output[1] * size_x + output[0]);
+    iterate_elements(&dfa, None, |element| {
+       let slice = element.as_slice();
+       let idx = 3 * (slice[1] * size_x + slice[0]);
        data[idx] = 255;
     });
 
