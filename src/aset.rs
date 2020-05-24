@@ -4,6 +4,7 @@ use crate::table::TransitionTable;
 use crate::dfa::Dfa;
 use crate::name::Name;
 use hashbrown::HashMap;
+use crate::common::StateId;
 
 #[derive(Debug, Clone)]
 pub struct AutomaticSet {
@@ -93,6 +94,20 @@ impl AutomaticSet {
         AutomaticSet {
             automaton: Automaton::Nfa(Nfa::new(table, vec![true, false], Nfa::simple_init())),
             track_names: vec![name1, name2, name3]
+        }
+    }
+
+    pub fn cut(&self, values: &Vec<usize>) -> AutomaticSet {
+        assert_eq!(values.len(), self.track_names.len());
+        cut(values)
+
+        let mut nfa = self.automaton.clone().to_dfa().neg().to_nfa();
+        nfa.join(&nfa.to_dfa().neg().to_nfa());
+        let dfa = nfa.to_dfa().neg();
+
+        AutomaticSet {
+            track_names: self.track_names.to_vec(),
+            automaton: Automaton::Dfa(dfa),
         }
     }
 

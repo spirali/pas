@@ -1,8 +1,48 @@
 use crate::words::{number_of_words, shortest_words, longest_words, Bound, number_of_words_zero_length, number_of_words_next_length};
 use crate::dfa::Dfa;
 use reduce::Reduce;
-use crate::nfa::Nfa;
+use crate::nfa::{Nfa, Transition};
 use crate::common::StateId;
+use crate::table::TransitionTable;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Element {
+    values: Vec<usize>,
+}
+
+impl Element {
+
+    pub fn new(n_tracks: usize) -> Self {
+        Element { values: vec![0; n_tracks] }
+    }
+
+    pub fn from(values: Vec<usize>) -> Self {
+        Element { values }
+    }
+
+    pub fn alphabet_size(&self) -> usize {
+        1 << self.values.len()
+    }
+
+    pub fn n_tracks(self) -> usize {
+        self.values.len()
+    }
+
+    pub fn push_symbol(&mut self, symbol: usize) {
+        for (i, t) in self.values.iter_mut().enumerate() {
+            *t <<= 1;
+            *t |= (symbol >> i) & 1;
+        }
+    }
+
+    pub fn pop_symbol(&mut self) {
+        for t in self.values.iter_mut() {
+            *t >>= 1;
+        }
+    }
+}
+
+
 
 fn push_tracks(tracks: &mut Vec<usize>, symbol: usize) {
     for (i, t) in tracks.iter_mut().enumerate() {
@@ -179,6 +219,33 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     }
 }
 
+pub fn cut(a_size: usize, values: Vec<usize>) -> Nfa {
+    let mut data = vec![];
+
+    let length = values.iter().map(|x| std::mem::size_of_val(x) - x.leading_zeros() as usize).max().unwrap();
+    for i in (0..length).rev() {
+        let mut sym = 0;
+        for v in values {
+            sym += (*v >> i) & 1;
+        }
+        for _ in 0..sym + 1 {
+            data.push(Transition::simple((i + 1) as StateId));
+        }
+        for _ in sym + 1..a_size {
+            data.push(Transition::simple((length + 1) as StateId));
+        }
+    }
+
+    for _ in 0..a_size {
+        data.push(Transition::simple((length + 1) as StateId)); /* Self loop */
+    }
+
+    let mut accepting = vec![true; length + 2];
+    accepting[length + 1] = false;
+
+    let nfa = Nfa::new(TransitionTable::new(values.len(), data), accepting, Nfa::simple_init());
+    nfa.to_dfa().reverse()
+}
 
 pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Vec<usize> {
     let mut tracks = vec![0; dfa.n_tracks()];

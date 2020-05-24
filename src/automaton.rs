@@ -47,4 +47,11 @@ impl Automaton {
             }
         }
     }
+
+    pub fn alphabet_size(&self) -> usize {
+        match self {
+            Self::Dfa(dfa) => dfa.alphabet_size(),
+            Self::Nfa(nfa) => nfa.alphabet_size(),
+        }
+    }
 }
