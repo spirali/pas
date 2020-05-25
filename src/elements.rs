@@ -286,10 +286,6 @@ pub fn cut(element: &Element) -> Nfa {
     let last = accepting.len() - 1;
     accepting[last] = false;
 
-    dbg!(accepting.len(), data.len());
-
-    dbg!(&data);
-
     let nfa = Nfa::new(TransitionTable::new(element.n_tracks(), data), accepting, Nfa::simple_init());
     nfa.write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
     nfa.to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();

@@ -4,18 +4,23 @@ use std::fs::File;
 use std::io::BufWriter;
 use crate::dfa::Dfa;
 
-pub fn render_set(dfa: &Dfa, path: &std::path::Path) {
-    assert_eq!(dfa.n_tracks(), 2);
-    let nfa = dfa.clone().to_nfa();
-    let size_x = get_max_value(&nfa, 0).to_limit().unwrap();
-    let size_y = get_max_value(&nfa, 1).to_limit().unwrap();
+pub fn render_set(dfas: &[&Dfa], colors: &[[u8; 3]], path: &std::path::Path) {
+    assert!(dfas.iter().all(|x| x.n_tracks() == 2));
+    let nfas : Vec<_> = dfas.iter().map(|dfa| dfa.as_nfa()).collect();
+    let size_x : usize = nfas.iter().map(|nfa| get_max_value(nfa, 0).to_limit().unwrap()).max().unwrap();
+    let size_y : usize = nfas.iter().map(|nfa| get_max_value(nfa, 1).to_limit().unwrap()).max().unwrap();
 
     let mut data : Vec<u8> = vec![0u8; 3 * size_x * size_y];
-    iterate_elements(&dfa, None, |element| {
-       let slice = element.as_slice();
-       let idx = 3 * (slice[1] * size_x + slice[0]);
-       data[idx] = 255;
-    });
+
+    for (i, dfa) in dfas.iter().enumerate() {
+        iterate_elements(&dfa, None, |element| {
+            let slice = element.as_slice();
+            let idx = 3 * (slice[1] * size_x + slice[0]);
+            data[idx] = colors[i][0];
+            data[idx + 1] = colors[i][1];
+            data[idx + 2] = colors[i][2];
+        });
+    }
 
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);

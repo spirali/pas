@@ -5,7 +5,7 @@ use crate::dfa::Dfa;
 use crate::name::Name;
 use hashbrown::HashMap;
 use crate::common::StateId;
-use crate::elements::{Element, cut, get_nth_element};
+use crate::elements::{Element, cut, get_nth_element, number_of_elements};
 
 #[derive(Debug, Clone)]
 pub struct AutomaticSet {
@@ -102,19 +102,7 @@ impl AutomaticSet {
         let self_dfa = self.automaton.as_dfa();
         let element = get_nth_element(&self_dfa, nth_element);
         assert_eq!(element.n_tracks(), self.track_names.len());
-
-        dbg!(&element);
-
         let cut_nfa = cut(&element);
-
-        //dbg!(&cut_nfa.to_dfa());
-
-        /*return AutomaticSet {
-            track_names: self.track_names.to_vec(),
-            automaton: Automaton::Dfa(cut_nfa.to_dfa()),
-        };*/
-        //dbg!(&cut_nfa.to_dfa());
-
         let neg_cut_nfa = cut_nfa.to_dfa().neg().to_nfa();
 
         let mut nfa = self_dfa.neg().to_nfa();
@@ -125,6 +113,32 @@ impl AutomaticSet {
             track_names: self.track_names.to_vec(),
             automaton: Automaton::Dfa(dfa),
         }
+    }
+
+    pub fn cut2(&self, nth_element: usize) -> (AutomaticSet, AutomaticSet) {
+        let self_dfa = self.automaton.as_dfa();
+        let element = get_nth_element(&self_dfa, nth_element);
+        assert_eq!(element.n_tracks(), self.track_names.len());
+
+        let cut_nfa = cut(&element);
+        let neg_cut_nfa = cut_nfa.to_dfa().neg().to_nfa();
+
+        let mut nfa1 = self_dfa.neg().to_nfa();
+        let mut nfa2 = nfa1.clone();
+        nfa1.join(&neg_cut_nfa);
+        let dfa1 = nfa1.to_dfa().neg();
+
+        nfa2.join(&cut_nfa);
+        let dfa2 = nfa2.to_dfa().neg();
+
+        (AutomaticSet {
+            track_names: self.track_names.to_vec(),
+            automaton: Automaton::Dfa(dfa1),
+        },
+        AutomaticSet {
+            track_names: self.track_names.to_vec(),
+            automaton: Automaton::Dfa(dfa2),
+        })
     }
 
     pub fn neg(self) -> AutomaticSet {
@@ -153,6 +167,10 @@ impl AutomaticSet {
 
     pub fn intersection(self, other: AutomaticSet) -> AutomaticSet {
         self.neg().union(other.neg()).neg()
+    }
+
+    pub fn size(&self) -> Option<usize> {
+        number_of_elements(&self.automaton.as_dfa())
     }
 
     pub fn order_tracks(&mut self, names: &[Name]) {
@@ -215,6 +233,11 @@ impl AutomaticSet {
     pub fn to_dfa(self) -> Dfa {
         self.automaton.to_dfa()
     }
+
+    pub fn as_dfa(&self) -> Dfa {
+        self.automaton.as_dfa()
+    }
+
 
     pub fn to_nfa(self) -> Nfa {
         self.automaton.to_nfa()

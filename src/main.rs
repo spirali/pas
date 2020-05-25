@@ -19,7 +19,7 @@ use crate::aset::AutomaticSet;
 use std::fs;
 use crate::parser::{setdef, parse_exact, unwrap_nom};
 use crate::solver::build_set;
-use crate::elements::get_max_value;
+use crate::elements::{get_max_value, number_of_elements};
 use crate::render::render_set;
 
 #[derive(Debug, StructOpt)]
@@ -32,6 +32,9 @@ enum Command {
         reverse: bool
     },
     Render {
+        output: String,
+    },
+    Split {
         output: String,
     },
     Stats,
@@ -83,7 +86,30 @@ fn main() {
         }
         Command::Render { output } => {
             let dfa = aset.to_dfa();
-            render_set(&dfa, Path::new(&output));
+            render_set(&[&dfa], &[[255, 0, 0]], Path::new(&output));
+        }
+        Command::Split { output } => {
+            //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
+            let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255]];
+            let count = colors.len();
+            let size = aset.size().unwrap() / count;
+            println!("TARGET SIZE {} {}", size, aset.size().unwrap());
+            let mut aset = aset;
+
+            let mut res = Vec::new();
+            for _ in 0..count - 1 {
+                let (a, b) = aset.cut2(size);
+                println!("ASIZE {:?} {:?}", a.size(), b.size());
+                res.push(a.to_dfa());
+                aset = b;
+            }
+            res.push(aset.to_dfa());
+
+            for r in &res {
+                println!("SIZE: {}", number_of_elements(r).unwrap());
+            }
+
+            render_set(&res.iter().collect::<Vec<_>>().as_slice(), colors, Path::new(&output));
         }
     };
 }

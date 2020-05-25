@@ -71,10 +71,10 @@ impl<T : Default + Clone> TransitionTable<T> {
         self.transitions.chunks(size)
     }
 
-    pub fn map_states<S, F>(self, f: F) -> TransitionTable<S> where F: FnMut(T) -> S, S: Default + Clone {
+    pub fn map_states<S, F>(&self, f: F) -> TransitionTable<S> where F: FnMut(&T) -> S, S: Default + Clone {
         TransitionTable {
             n_tracks: self.n_tracks,
-            transitions: self.transitions.into_iter().map(f).collect(),
+            transitions: self.transitions.iter().map(f).collect(),
         }
     }
 

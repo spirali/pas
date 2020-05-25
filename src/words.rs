@@ -112,14 +112,11 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
         if !a && s.iter().all(|x| *x == state) {
             output[i] = Some(0);
             remaining[i] += 1; // To prevent it rerunning process again
-            dbg!("S", &remaining);
             process(state, &mut s_next, &mut remaining);
-            dbg!("X", &remaining);
         }
     }
 
     let mut s_current = Vec::<StateId>::with_capacity(dfa.n_states());
-    dbg!(&s_next, &remaining);
     while !s_next.is_empty() {
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();

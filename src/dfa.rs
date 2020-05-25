@@ -90,9 +90,11 @@ impl Dfa {
     }
 
     pub fn to_nfa(self) -> Nfa {
-        let mut initial_states = HashSet::default();
-        initial_states.insert(0);
-        Nfa::new(self.table.map_states(Transition::simple), self.accepting, initial_states)
+        Nfa::new(self.table.map_states(|s| Transition::simple(*s)), self.accepting, Nfa::simple_init())
+    }
+
+    pub fn as_nfa(&self) -> Nfa {
+        Nfa::new(self.table.map_states(|s| Transition::simple(*s)), self.accepting.clone(), Nfa::simple_init())
     }
 
     pub fn reverse_table(&self) -> TransitionTable<Transition>

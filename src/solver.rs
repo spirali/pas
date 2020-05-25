@@ -149,7 +149,6 @@ mod tests {
         }
 
         let mut a = evaluate_formula(&parse_formula("3 * x == 60").make_lo_formula());
-        dbg!(a.track_names());
         for i in 0..100 {
             assert_eq!(a.test_input(&[("x", i)]), i == 20);
         }
