@@ -1,3 +1,18 @@
+use std::fs;
+use std::fs::File;
+use std::io::BufWriter;
+use std::path::Path;
+use std::str::FromStr;
+
+use structopt::StructOpt;
+
+use crate::aset::AutomaticSet;
+use crate::elements::{get_max_value, iterate_elements, number_of_elements};
+use crate::parser::{parse_exact, setdef, unwrap_nom};
+use crate::render::dot::render_set_dot;
+use crate::render::png::render_set_png;
+use crate::solver::build_set;
+
 mod common;
 mod name;
 mod table;
@@ -10,23 +25,12 @@ mod solver;
 mod parser;
 mod words;
 mod elements;
+
 mod render {
     pub(crate) mod png;
     pub(crate) mod dot;
 }
 
-use structopt::StructOpt;
-use std::path::Path;
-use crate::aset::AutomaticSet;
-use std::fs;
-use crate::parser::{setdef, parse_exact, unwrap_nom};
-use crate::solver::build_set;
-use crate::elements::{get_max_value, number_of_elements};
-use std::str::FromStr;
-use std::fs::File;
-use std::io::BufWriter;
-use crate::render::png::render_set_png;
-use crate::render::dot::render_set_dot;
 
 #[derive(Debug)]
 enum RenderFormat {
@@ -52,17 +56,18 @@ enum Command {
         #[structopt(long)]
         with_sink: bool,
         #[structopt(long)]
-        reverse: bool
+        reverse: bool,
     },
     Render {
         format: RenderFormat,
         output: String,
     },
+    Iterate,
     Split {
         output: String,
     },
     Stats,
-    IsEmpty
+    IsEmpty,
 }
 
 #[derive(Debug, StructOpt)]
@@ -101,10 +106,10 @@ fn main() {
                 aset.to_nfa()
             };
             nfa.write_dot(Path::new(&output), !with_sink).unwrap()
-        },
+        }
         Command::Stats => {
             print_stats(aset);
-        },
+        }
         Command::IsEmpty => {
             println!("Empty: {}", aset.is_empty());
         }
@@ -116,6 +121,12 @@ fn main() {
                 RenderFormat::Png => render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer),
                 RenderFormat::Dot => render_set_dot(&dfa, &mut writer),
             }
+        }
+        Command::Iterate => {
+            let dfa = aset.to_dfa();
+            iterate_elements(&dfa, None, |element| {
+                println!("{:?}", element.values);
+            })
         }
         Command::Split { output } => {
             //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
