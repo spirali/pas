@@ -10,8 +10,10 @@ mod solver;
 mod parser;
 mod words;
 mod elements;
-mod render;
-
+mod render {
+    pub(crate) mod png;
+    pub(crate) mod dot;
+}
 
 use structopt::StructOpt;
 use std::path::Path;
@@ -20,7 +22,28 @@ use std::fs;
 use crate::parser::{setdef, parse_exact, unwrap_nom};
 use crate::solver::build_set;
 use crate::elements::{get_max_value, number_of_elements};
-use crate::render::render_set;
+use std::str::FromStr;
+use std::fs::File;
+use std::io::BufWriter;
+use crate::render::png::render_set_png;
+use crate::render::dot::render_set_dot;
+
+#[derive(Debug)]
+enum RenderFormat {
+    Png,
+    Dot,
+}
+
+impl FromStr for RenderFormat {
+    type Err = String;
+    fn from_str(format: &str) -> Result<Self, Self::Err> {
+        match format {
+            "png" => Ok(RenderFormat::Png),
+            "dot" => Ok(RenderFormat::Dot),
+            _ => Err(format!("Render format '{}' does not exist", format)),
+        }
+    }
+}
 
 #[derive(Debug, StructOpt)]
 enum Command {
@@ -32,6 +55,7 @@ enum Command {
         reverse: bool
     },
     Render {
+        format: RenderFormat,
         output: String,
     },
     Split {
@@ -84,9 +108,14 @@ fn main() {
         Command::IsEmpty => {
             println!("Empty: {}", aset.is_empty());
         }
-        Command::Render { output } => {
+        Command::Render { output, format } => {
             let dfa = aset.to_dfa();
-            render_set(&[&dfa], &[[255, 0, 0]], Path::new(&output));
+            let file = File::create(output).unwrap();
+            let mut writer = BufWriter::new(file);
+            match format {
+                RenderFormat::Png => render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer),
+                RenderFormat::Dot => render_set_dot(&dfa, &mut writer),
+            }
         }
         Command::Split { output } => {
             //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
@@ -109,7 +138,9 @@ fn main() {
                 println!("SIZE: {}", number_of_elements(r).unwrap());
             }
 
-            render_set(&res.iter().collect::<Vec<_>>().as_slice(), colors, Path::new(&output));
+            let file = File::create(output).unwrap();
+            let mut writer = BufWriter::new(file);
+            render_set_png(&res.iter().collect::<Vec<_>>().as_slice(), colors, &mut writer);
         }
     };
 }

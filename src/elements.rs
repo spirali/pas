@@ -7,7 +7,7 @@ use crate::table::TransitionTable;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Element {
-    values: Vec<usize>,
+    pub(crate) values: Vec<usize>,
 }
 
 impl Element {
