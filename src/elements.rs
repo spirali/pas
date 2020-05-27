@@ -1,9 +1,9 @@
 use crate::words::{number_of_words, shortest_words, longest_words, Bound, number_of_words_zero_length, number_of_words_next_length};
 use crate::dfa::Dfa;
-use reduce::Reduce;
 use crate::nfa::{Nfa, Transition};
 use crate::common::StateId;
 use crate::table::TransitionTable;
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Element {
@@ -95,7 +95,7 @@ pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
     let dfa = dfa.reverse().to_dfa();
     let number_of_words = number_of_words(&dfa);
     let transitions = dfa.get_state(0);
-    let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).reduce(|a,b| a + b);
+    let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).fold1(|a,b| a + b);
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
 
