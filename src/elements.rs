@@ -55,7 +55,8 @@ impl Element {
 
     pub fn get_symbol(&self, position: usize) -> usize {
         let mut sym = 0;
-        for v in &self.values {
+        for v in self.values.iter().rev() {
+            sym <<= 1;
             sym += (*v >> position) & 1;
         }
         sym
@@ -495,5 +496,38 @@ mod tests {
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![2, 1]);
         assert_eq!(get_nth_element(&a, 2).into_vec(), vec![3, 2]);
         assert_eq!(get_nth_element(&a, 7001).into_vec(), vec![7002, 7001]);
+    }
+
+
+    #[test]
+    fn test_nth_element2() {
+        let def = "{ x, y | x < 500 and y < 500 and ((x < 100 or x > 400) and 10 * z == y or (y + 100 < x and x < 400) or ((x > 240 and x < 260 and y > 240 and y < 290 ))) }";
+        let a = build_set(&parse_setdef(def));
+
+        let (c, d) = a.cut2(16);
+        assert_eq!(number_of_elements(&c.to_dfa()), Some(17));
+
+
+        /*let mut i = 0;
+        iterate_elements(&a.as_dfa(), Some(17), |element| {
+            dbg!(i, &element);
+            i += 1;
+        });*/
+    }
+
+    #[test]
+    fn test_get_symbol() {
+        let mut e = Element::new(2);
+        e.push_symbol(3);
+        e.push_symbol(1);
+        e.push_symbol(2);
+        e.push_symbol(1);
+        e.push_symbol(0);
+        dbg!(&e);
+        assert_eq!(e.get_symbol(0), 0);
+        assert_eq!(e.get_symbol(1), 1);
+        assert_eq!(e.get_symbol(2), 2);
+        assert_eq!(e.get_symbol(3), 1);
+        assert_eq!(e.get_symbol(4), 3);
     }
 }

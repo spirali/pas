@@ -129,8 +129,8 @@ fn main() {
             })
         }
         Command::Split { output } => {
-            //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
-            let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255]];
+            let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
+            //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255]];
             let count = colors.len();
             let size = aset.size().unwrap() / count;
             println!("TARGET SIZE {} {}", size, aset.size().unwrap());
