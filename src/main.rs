@@ -8,10 +8,10 @@ use structopt::StructOpt;
 
 use crate::aset::AutomaticSet;
 use crate::elements::{get_max_value, iterate_elements, number_of_elements};
-use crate::parser::{parse_exact, setdef, unwrap_nom};
+use crate::parser::{parse_exact, setdef, unwrap_nom, commands, Command};
 use crate::render::dot::render_set_dot;
 use crate::render::png::render_set_png;
-use crate::solver::build_set;
+use crate::solver::{build_set, Context};
 
 mod common;
 mod name;
@@ -49,7 +49,7 @@ impl FromStr for RenderFormat {
     }
 }
 
-#[derive(Debug, StructOpt)]
+/*#[derive(Debug, StructOpt)]
 enum Command {
     NfaDot {
         output: String,
@@ -68,36 +68,32 @@ enum Command {
     },
     Stats,
     IsEmpty,
-}
+}*/
 
 #[derive(Debug, StructOpt)]
 struct Opts {
-    #[structopt(long)]
     file: String,
-    #[structopt(subcommand)]
-    command: Command,
+    /*#[structopt(subcommand)]
+    command: Command,*/
 }
 
-fn read_file(path: &Path) -> AutomaticSet {
+fn read_file(path: &Path) -> Vec<Command> {
     let content = fs::read_to_string(path).unwrap();
     let input = content.trim();
-    let (_, sdef) = unwrap_nom(input, parse_exact(setdef, input));
-    build_set(&sdef)
-}
-
-fn print_stats(aset: AutomaticSet) {
-    let names = aset.track_names().to_vec();
-    let dfa = aset.to_dfa();
-    println!("DFA size: {}", dfa.n_states());
-    let nfa = dfa.to_nfa();
-    for (i, name) in names.iter().enumerate() {
-        println!("Max {:?}: {}", name, get_max_value(&nfa, i).to_string());
-    }
+    let (_, cmds) = unwrap_nom(input, parse_exact(commands, input));
+    cmds
 }
 
 fn main() {
     let opts = Opts::from_args();
-    let aset = read_file(Path::new(&opts.file));
+    let cmds = read_file(Path::new(&opts.file));
+    let mut context = Context::new();
+
+    for cmd in cmds {
+        context.eval(cmd);
+    }
+
+    /*
     match opts.command {
         Command::NfaDot { output, with_sink, reverse } => {
             let nfa = if reverse {
@@ -153,5 +149,5 @@ fn main() {
             let mut writer = BufWriter::new(file);
             render_set_png(&res.iter().collect::<Vec<_>>().as_slice(), colors, &mut writer);
         }
-    };
+    };*/
 }

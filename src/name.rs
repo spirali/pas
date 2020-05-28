@@ -42,7 +42,7 @@ impl Name {
 impl fmt::Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(&match self {
-               Self::Named(s) => format!("${}", &s),
+               Self::Named(s) => format!("{}", &s),
                Self::Tmp(s) => format!("#{}", &s),
         })
     }

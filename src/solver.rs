@@ -1,7 +1,70 @@
 use crate::aset::AutomaticSet;
 use crate::formula::{LoFormula, LoPredicate};
-use crate::parser::SetDef;
+use crate::parser::{SetDef, Command};
 use hashbrown::HashSet;
+use crate::name::Name;
+use crate::elements::get_max_value;
+use crate::render::png::render_set_png;
+use std::io::BufWriter;
+use std::fs::File;
+
+#[derive(Debug)]
+pub struct Context {
+    sets: hashbrown::HashMap<Name, AutomaticSet>
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Context {
+            sets: Default::default()
+        }
+    }
+
+    pub fn get_set(&self, name: &Name) -> &AutomaticSet {
+        self.sets.get(&name).unwrap_or_else(|| {
+           panic!("Set '{:?}' not defined", name);
+        })
+    }
+
+    pub fn eval(&mut self, cmd: Command) {
+        match cmd {
+            Command::SetDef(name, setdef) => {
+                let name = Name::new(name);
+                self.sets.insert(name, build_set(&setdef));
+            },
+            Command::Call(name, args) => {
+                match name.as_str() {
+                    "render_png" => {
+                        let mut args = args.into_iter();
+                        let set_name = Name::new(args.next().unwrap());
+                        let output = format!("{}.png", args.next().unwrap());
+                        let dfa = self.get_set(&set_name).as_dfa();
+
+                        let file = File::create(output).unwrap();
+                        let mut writer = BufWriter::new(file);
+                        render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer);
+                    },
+                    "stats" => {
+                        print_stats(self.get_set(&Name::new(args.into_iter().next().unwrap())))
+                    },
+                    name => {
+                        panic!("Unknown command '{}'", name);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn print_stats(aset: &AutomaticSet) {
+    let names = aset.track_names().to_vec();
+    let dfa = aset.as_dfa();
+    println!("DFA size: {}", dfa.n_states());
+    let nfa = dfa.to_nfa();
+    for (i, name) in names.iter().enumerate() {
+        println!("Max {:?}: {}", name, get_max_value(&nfa, i).to_string());
+    }
+}
 
 pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
     match pred {

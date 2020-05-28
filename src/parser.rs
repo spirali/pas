@@ -2,8 +2,8 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, digit1, multispace0};
 use nom::combinator::{all_consuming, map, map_res, opt};
-use nom::error::{convert_error, VerboseError};
-use nom::IResult;
+use nom::error::{convert_error, VerboseError, ErrorKind};
+use nom::{IResult, InputTakeAtPosition};
 use nom::multi::{fold_many0, separated_list};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 
@@ -29,6 +29,13 @@ impl SetDef {
     }
 }
 
+
+#[derive(Debug)]
+pub enum Command {
+    SetDef(String, SetDef),
+    Call(String, Vec<String>)
+}
+
 fn integer(input: &str) -> NomResult<u64>
 {
     map_res(digit1, |digit_str: &str| {
@@ -36,20 +43,27 @@ fn integer(input: &str) -> NomResult<u64>
     })(input)
 }
 
-fn variable(input: &str) -> NomResult<String>
+pub fn is_id_char(c: char) -> bool {
+    match c {
+        'A'..='Z' | 'a'..='z' | '_' => true,
+        _ => false,
+    }
+}
+
+fn identifier(input: &str) -> NomResult<String>
 {
-    map(alpha1, |s: &str| s.to_string())(input)
+    input.split_at_position1_complete(|item| !is_id_char(item), ErrorKind::Alpha).map(|(x, y)| (x, y.to_string()))
 }
 
 fn atom(input: &str) -> NomResult<Atom> {
     alt((
-        map(tuple((integer, opt(preceded(tuple((multispace0, tag("*"), multispace0)), variable)))), |r| {
+        map(tuple((integer, opt(preceded(tuple((multispace0, tag("*"), multispace0)), identifier)))), |r| {
             match r {
                 (value, None) => Atom::Constant(value),
                 (value, Some(name)) => Atom::Variable(Name::new(name), value)
             }
         }),
-        map(variable, |r| Atom::Variable(Name::new(r), 1)),
+        map(identifier, |r| Atom::Variable(Name::new(r), 1)),
     ))(input)
 }
 
@@ -89,7 +103,7 @@ fn quantifier(input: &str) -> NomResult<Quantifier> {
         terminated(alt((tag("exists"), tag("forall"))), multispace0),
         delimited(
             pair(tag("("), multispace0),
-            variable,
+            identifier,
             pair(tag(")"), multispace0),
         ),
     ), |r| {
@@ -146,13 +160,16 @@ fn formula(input: &str) -> IResult<&str, HiFormula, VerboseError<&str>> {
     formula_or(input)
 }
 
-fn varlist(input: &str) -> NomResult<Vec<Name>> {
-    map(terminated(separated_list(tuple((multispace0, tag(","), multispace0)), variable), multispace0),
-        |r| r.iter().map(|x| Name::from_str(x)).collect())(input)
+fn id_list(input: &str) -> NomResult<Vec<String>> {
+    terminated(separated_list(tuple((multispace0, tag(","), multispace0)), identifier), multispace0)(input)
+}
+
+fn var_list(input: &str) -> NomResult<Vec<Name>> {
+    map(id_list, |r| r.iter().map(|x| Name::from_str(x)).collect())(input)
 }
 
 fn setout(input: &str) -> NomResult<Vec<Name>> {
-    terminated(varlist, tuple((multispace0, tag("|"), multispace0)))(input)
+    terminated(var_list, tuple((multispace0, tag("|"), multispace0)))(input)
 }
 
 pub fn setdef(input: &str) -> NomResult<SetDef> {
@@ -166,6 +183,17 @@ pub fn setdef(input: &str) -> NomResult<SetDef> {
     })(input)
 }
 
+pub fn command(input: &str) -> NomResult<Command> {
+    alt((
+        map(tuple((identifier, delimited(multispace0, tag("="), multispace0), setdef)), |(name, _, sd)| Command::SetDef(name, sd)),
+        map(tuple((identifier, delimited(delimited(multispace0, tag("("), multispace0), id_list, delimited(multispace0, tag(")"), multispace0)))), |(name, args)| Command::Call(name, args)),
+    ))(input)
+}
+
+pub fn commands(input: &str) -> NomResult<Vec<Command>> {
+    terminated(separated_list(tuple((multispace0, tag(";"), multispace0)), command), multispace0)(input)
+}
+
 pub fn parse_formula(input: &str) -> HiFormula {
     formula(input).unwrap().1
 }
@@ -173,6 +201,7 @@ pub fn parse_formula(input: &str) -> HiFormula {
 pub fn parse_setdef(input: &str) -> SetDef {
     setdef(input).unwrap().1
 }
+
 
 /*fn named_defset(input: &str) -> NomResult<SetDef> {
     map(tuple((variable, tuple((multispace0, tag("="), multispace0)), formula)), |(name, _, f)| {
@@ -266,6 +295,14 @@ mod test {
     #[test]
     fn test_parser_exact() {
         assert!(parse_exact(setdef, "{ x, y | x <= 10 and 2 < x } + 1").is_err());
+    }
+
+    #[test]
+    fn test_parser_commands() {
+        let (_, cs) = parse_exact(commands, "aa = { x | x == x }").unwrap();
+        assert_eq!(cs.len(), 1);
+        let (_, cs) = parse_exact(commands, "set = { x | x == y + 1}; print(set)").unwrap();
+        assert_eq!(cs.len(), 2);
     }
 
     #[test]
