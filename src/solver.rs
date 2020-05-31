@@ -7,6 +7,7 @@ use crate::elements::get_max_value;
 use crate::render::png::render_set_png;
 use std::io::BufWriter;
 use std::fs::File;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct Context {
@@ -44,6 +45,13 @@ impl Context {
                         let mut writer = BufWriter::new(file);
                         render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer);
                     },
+                    "nfa_dot" => {
+                        let mut args = args.into_iter();
+                        let set_name = Name::new(args.next().unwrap());
+                        let output = format!("{}.dot", args.next().unwrap());
+                        let nfa = self.get_set(&set_name).clone().to_nfa();
+                        nfa.write_dot(Path::new(&output), true).unwrap();
+                    }
                     "stats" => {
                         print_stats(self.get_set(&Name::new(args.into_iter().next().unwrap())))
                     },
