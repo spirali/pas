@@ -65,6 +65,17 @@ impl LoPredicate {
     pub fn to_formula(self) -> LoFormula {
         LoFormula::Predicate(self)
     }
+
+    pub fn rename_free_var(self, name_from: &Name, name_to: &Name) -> Self {
+        let change = |name| if name_from == &name { name_to.clone() } else { name };
+        match self {
+            Self::Add(name1, name2, name3) => Self::Add(change(name1), change(name2), change(name3)),
+            Self::Eq(name1, name2) => Self::Eq(change(name1), change(name2)),
+            Self::Double(name1, name2) => Self::Double(change(name1), change(name2)),
+            Self::EqConst(name1, v) => Self::EqConst(change(name1), v),
+            Self::True | Self::False => self,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -148,17 +159,57 @@ impl LoFormula {
             },
         }
     }
+
+    pub fn rename_free_var(self, name_from: &Name, name_to: &Name) -> Self {
+        match self {
+            Self::Predicate(p) => Self::Predicate(p.rename_free_var(name_from, name_to)),
+            Self::Neg(f) => Self::Neg(Box::new(f.rename_free_var(name_from, name_to))),
+            Self::Or(f1, f2) => {
+                Self::Or(Box::new(f1.rename_free_var(name_from, name_to)), Box::new(f2.rename_free_var(name_from, name_to)))
+            },
+            Self::Exists(name, f) if &name != name_from => Self::Exists(name, Box::new(f.rename_free_var(name_from, name_to))),
+            x @ Self::Exists(_, _) => x,
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum Atom {
-    Variable(Name, u64),
-    Constant(u64),
+pub struct Variable {
+    pub(crate) name: Name,
+    scale: u64,
+    modulo: u64,
 }
 
-impl Atom {
+impl Variable {
+    pub fn from_str(name: &str) -> Self {
+        Variable {
+            name: Name::from_str(name),
+            scale: 1,
+            modulo: 1,
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Expression {
+    Variable(Name),
+    Constant(u64),
+    Add(Vec<Expression>),
+    Mul(Box<Expression>, u64),
+    Mod(Box<Expression>, u64),
+}
+
+impl Expression {
     pub fn from_name(name: Name) -> Self {
-        Self::Variable(name, 1)
+        Self::Variable(name)
+    }
+
+    pub fn new_add(exprs: Vec<Expression>) -> Self {
+        assert!(!exprs.is_empty());
+        if exprs.len() == 1 {
+            return exprs.into_iter().next().unwrap();
+        }
+        Expression::Add(exprs)
     }
 }
 
@@ -171,22 +222,22 @@ pub enum BinOp {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum HiPredicate {
-    BinOp(BinOp, Vec<Atom>, Vec<Atom>),
+    BinOp(BinOp, Expression, Expression),
     True,
     False
 }
 
 impl HiPredicate {
 
-    fn eq_optimize(lhs: &[Atom], rhs: &[Atom]) -> Option<LoFormula> {
+    fn eq_optimize(lhs: &Expression, rhs: &Expression) -> Option<LoFormula> {
         match (lhs, rhs) {
-            ([Atom::Variable(name1, 1), Atom::Variable(name2, 1)], [Atom::Variable(name3, 1)]) => {
+            /*([Expression::Variable(name1), Expression::Variable(name2)], [Expression::Variable(name3)]) => {
                 Some(LoPredicate::safe_add(name1.clone(), name2.clone(), name3.clone()).to_formula())
-            },
-            ([Atom::Variable(name1, 2)], [Atom::Variable(name2, 1)]) => {
+            },*/
+            /*([Expression::Variable(Variable{name: name1, scale: 2, modulo: 1})], [Expression::Variable(Variable{name: name2, scale: 1, modulo: 1})]) => {
                 Some(LoPredicate::safe_double(name1.clone(), name2.clone()).to_formula())
-            },
-            ([Atom::Variable(name, 1)], [Atom::Constant(c)]) => {
+            },*/
+            (Expression::Variable(name), Expression::Constant(c)) => {
                 Some(LoPredicate::EqConst(name.clone(), *c).to_formula())
             },
             _ => None,
@@ -197,15 +248,15 @@ impl HiPredicate {
         match self {
             HiPredicate::BinOp(op, lhs, rhs) => {
                 if let BinOp::Eq = op {
-                    if let Some(f) = Self::eq_optimize(lhs.as_slice(), rhs.as_slice()) {
+                    if let Some(f) = Self::eq_optimize(lhs, rhs) {
                         return f;
                     }
-                    if let Some(f) = Self::eq_optimize(rhs.as_slice(), lhs.as_slice()) {
+                    if let Some(f) = Self::eq_optimize(rhs, lhs) {
                         return f;
                     }
                 }
-                let (lf, name1) = Self::expr_to_lo_formula(&lhs);
-                let (rf, name2) = Self::expr_to_lo_formula(&rhs);
+                let (lf, name1) = Self::expression_to_lo_formula(lhs);
+                let (rf, name2) = Self::expression_to_lo_formula(rhs);
                 if name1 == name2 {
                     match op {
                         BinOp::Lt => LoPredicate::False.to_formula(),
@@ -232,19 +283,44 @@ impl HiPredicate {
         }
     }
 
-    fn atom_to_lo_formula(atom: &Atom) -> (LoFormula, Name) {
-        match atom {
-            Atom::Constant(v) => {
+    fn expression_to_lo_formula(expression: &Expression) -> (LoFormula, Name) {
+        match expression {
+            Expression::Constant(v) => {
                 let fresh = Name::new_tmp();
                 (LoPredicate::EqConst(fresh.clone(), *v).to_formula(), fresh)
             },
-            Atom::Variable(v, 1) => (LoPredicate::True.to_formula(), v.clone()),
-            Atom::Variable(v, 0) => (LoPredicate::EqConst(v.clone(), 0).to_formula(), v.clone()),
-            Atom::Variable(v, mut x) => {
-                //let mut value = x;
-                let mut exp_var = v.clone();
+            Expression::Variable(v) => (LoPredicate::True.to_formula(), v.clone()),
+            Expression::Add(es) => {
+                assert!(es.len() >= 2);
+                let (mut f1, mut name1) = Self::expression_to_lo_formula(&es[0]);
+                for e in &es[1..] {
+                    let (f2, name2) = Self::expression_to_lo_formula(e);
+                    let fresh = Name::new_tmp();
+                    let f3 = LoFormula::Predicate(LoPredicate::safe_add(name1.clone(), name2.clone(), fresh.clone()));
+                    f1 = f3.and(f1).close_if_tmp(&name1).and(f2).close_if_tmp(&name2);
+                    name1 = fresh
+                }
+                (f1, name1)
+            },
+            Expression::Mod(expr, x) => {
+                // E % x == OUT ~~> exists(T)(T * x + OUT == E) and OUT < x
+                let var_t = Name::new_unnamed();
+                let var_out = Name::new_unnamed();
+                let tmp_e1 = Expression::Add(vec![Expression::Mul(Box::new(Expression::Variable(var_t.clone())), *x), Expression::Variable(var_out.clone())]);
+                let formula1 = HiFormula::Exists(var_t.clone(), Box::new(HiFormula::Predicate(HiPredicate::BinOp(BinOp::Eq, *expr.clone(), tmp_e1))));
+                let formula2 = HiFormula::Predicate(HiPredicate::BinOp(BinOp::Lt, Expression::Variable(var_out.clone()), Expression::Constant(*x)));
+                let formula = HiFormula::And(Box::new(formula1), Box::new(formula2));
+                let fresh_tmp = Name::new_tmp();
+                (formula.make_lo_formula().rename_free_var(&var_out, &fresh_tmp), fresh_tmp)
+
+            },
+            Expression::Mul(e, mut x) => {
+                if x == 0 {
+                    todo!();
+                }
+                let (mut formula, mut exp_var) = Self::expression_to_lo_formula(e);
                 let mut out_var = None;
-                let mut formula = LoPredicate::True.to_formula();
+                //let mut formula = LoPredicate::True.to_formula();
                 loop {
                     let mut close = true;
                     if x & 1 == 1 {
@@ -274,19 +350,6 @@ impl HiPredicate {
                 }
             }
         }
-    }
-
-    fn expr_to_lo_formula(atoms: &[Atom]) -> (LoFormula, Name) {
-        // x + y + z = fresh1 ===>  x + y
-        if atoms.len() == 1 {
-            return Self::atom_to_lo_formula(&atoms[0]);
-        }
-        assert!(atoms.len() > 1);
-        let fresh = Name::new_tmp();
-        let (f1, name1) = Self::atom_to_lo_formula(&atoms[0]);
-        let (f2, name2) = Self::expr_to_lo_formula(&atoms[1..]);
-        let f3 = LoFormula::Predicate(LoPredicate::safe_add(name1.clone(), name2.clone(), fresh.clone()));
-        (f3.and(f1).close_if_tmp(&name1).and(f2).close_if_tmp(&name2), fresh)
     }
 }
 

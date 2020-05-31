@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(collect_elements(&a.cut(3, true).to_dfa(), None), vec![vec![6], vec![8], vec![10], vec![12]]);
 
         let a = build_set(&parse_setdef("{ x, y | x == y + 13 or x == y + 11}"));
-        assert_eq!(collect_elements(&a.cut(5, true).to_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2]]);
+        assert_eq!(collect_elements(&a.cut(5, true).to_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2], vec![15, 2]]);
     }
 
 }

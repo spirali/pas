@@ -234,6 +234,11 @@ mod tests {
         assert!(a.test_input(&[("x", 30), ("y", 111)]));
         assert!(!a.test_input(&[("x", 31), ("y", 111)]));
         assert!(!a.test_input(&[("x", 30), ("y", 110)]));
+
+        let mut a = evaluate_formula(&parse_formula("x % 7 == 2 and x > 100").make_lo_formula());
+        for i in 0..200 {
+            assert_eq!(a.test_input(&[("x", i)]), i % 7 == 2 && i > 100);
+        }
     }
 
     #[test]

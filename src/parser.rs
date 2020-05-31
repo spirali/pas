@@ -7,7 +7,7 @@ use nom::{IResult, InputTakeAtPosition};
 use nom::multi::{fold_many0, separated_list};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 
-use crate::formula::{Atom, HiFormula};
+use crate::formula::{Expression, HiFormula, Variable};
 use crate::formula::{BinOp, HiPredicate};
 use crate::name::Name;
 
@@ -55,19 +55,24 @@ fn identifier(input: &str) -> NomResult<String>
     input.split_at_position1_complete(|item| !is_id_char(item), ErrorKind::Alpha).map(|(x, y)| (x, y.to_string()))
 }
 
-fn atom(input: &str) -> NomResult<Atom> {
+fn atom(input: &str) -> NomResult<Expression> {
     alt((
         map(tuple((integer, opt(preceded(tuple((multispace0, tag("*"), multispace0)), identifier)))), |r| {
             match r {
-                (value, None) => Atom::Constant(value),
-                (value, Some(name)) => Atom::Variable(Name::new(name), value)
+                (value, None) => Expression::Constant(value),
+                (value, Some(name)) => Expression::Mul(Box::new(Expression::Variable(Name::new(name))), value),
             }
         }),
-        map(identifier, |r| Atom::Variable(Name::new(r), 1)),
-    ))(input)
+        map(tuple((identifier, opt(preceded(tuple((multispace0, tag("%"), multispace0)), integer)))), |r| {
+            match r {
+                (name, None) => Expression::Variable(Name::new(name)),
+                (name, Some(value)) => Expression::Mod(Box::new(Expression::Variable(Name::new(name))), value)
+            }
+        })
+        ))(input)
 }
 
-fn expr(input: &str) -> NomResult<Vec<Atom>> {
+fn expr(input: &str) -> NomResult<Vec<Expression>> {
     separated_list(tuple((multispace0, tag("+"), multispace0)), atom)(input)
 }
 
@@ -77,6 +82,8 @@ fn operator(input: &str) -> NomResult<&str> {
 
 fn predicate(input: &str) -> NomResult<HiPredicate> {
     map(tuple((expr, delimited(multispace0, operator, multispace0), expr)), |(lhs, op, rhs)| {
+        let lhs = Expression::new_add(lhs);
+        let rhs = Expression::new_add(rhs);
         match op {
             "==" => HiPredicate::BinOp(BinOp::Eq, lhs, rhs),
             "<=" => HiPredicate::BinOp(BinOp::Lte, lhs, rhs),
@@ -236,28 +243,29 @@ mod test {
 
     #[test]
     fn parse_atom() {
-        assert_eq!(Ok(("", Atom::Variable(Name::from_str("hello"), 1))), atom("hello"));
-        assert_eq!(Ok(("", Atom::Variable(Name::from_str("hello"), 23))), atom("23 * hello"));
-        assert_eq!(Ok(("", Atom::Variable(Name::from_str("hello"), 0))), atom("0*hello"));
-        assert_eq!(Ok(("", Atom::Constant(17))), atom("17"));
+        assert_eq!(Ok(("", Expression::Variable(Name::from_str("hello")))), atom("hello"));
+        assert_eq!(Ok(("", Expression::Mul(Box::new(Expression::Variable(Name::from_str("hello"))), 23))), atom("23 * hello"));
+        assert_eq!(Ok(("", Expression::Mul(Box::new(Expression::Variable(Name::from_str("hello"))), 0))), atom("0*hello"));
+        assert_eq!(Ok(("", Expression::Constant(17))), atom("17"));
+        assert_eq!(Ok(("", Expression::Mod(Box::new(Expression::Variable(Name::from_str("hello"))), 23))), atom("hello % 23"));
     }
 
     #[test]
     fn parse_expr() {
-        let x1 = Atom::Variable(Name::from_str("x"), 1);
-        assert_eq!(Ok(("", vec![x1, Atom::Constant(2)])), expr("x + 2"));
-        assert_eq!(Ok(("", vec![Atom::Constant(17)])), expr("17"));
-        let xx2 = Atom::Variable(Name::from_str("xx"), 2);
-        let yy2 = Atom::Variable(Name::from_str("yy"), 3);
-        assert_eq!(Ok(("", vec![xx2, yy2])), expr("2 * xx + 3 * yy"));
+        let x1 = Expression::Variable(Name::from_str("x"));
+        assert_eq!(Ok(("", vec![x1, Expression::Constant(2)])), expr("x + 2"));
+        assert_eq!(Ok(("", vec![Expression::Constant(17)])), expr("17"));
+        let xx2 = Expression::Variable(Name::from_str("xx"));
+        let yy2 = Expression::Variable(Name::from_str("yy"));
+        assert_eq!(Ok(("", vec![Expression::Mul(Box::new(xx2), 2), Expression::Mul(Box::new(yy2), 3)])), expr("2 * xx + 3 * yy"));
     }
 
     #[test]
     fn test_parse_predicate() {
-        let x1 = Atom::Variable(Name::from_str("x"), 1);
-        let y3 = Atom::Variable(Name::from_str("y"), 3);
-        let c2 = Atom::Constant(2);
-        assert_eq!(Ok(("", HiPredicate::BinOp(BinOp::Eq, vec![x1, c2], vec![y3]))), predicate("x + 2 == 3 * y"));
+        let x1 = Expression::Variable(Name::from_str("x"));
+        let y3 = Expression::Mul(Box::new(Expression::Variable(Name::from_str("y"))), 3);
+        let c2 = Expression::Constant(2);
+        assert_eq!(Ok(("", HiPredicate::BinOp(BinOp::Eq, Expression::Add(vec![x1, c2]), y3))), predicate("x + 2 == 3 * y"));
     }
 
     #[test]
@@ -312,10 +320,10 @@ mod test {
         let y = String::from("y");
         let exists = Box::new(HiFormula::Exists(Name::Named(y.clone()), Box::new(HiFormula::Predicate(
             HiPredicate::BinOp(BinOp::Lt,
-                               vec!(Atom::from_name(Name::new(x.clone()))),
-                               vec!(Atom::from_name(Name::new(y))),
+                               Expression::from_name(Name::new(x.clone())),
+                               Expression::from_name(Name::new(y))),
             ))
-        )));
+        ));
         assert_eq!(f, HiFormula::ForAll(Name::Named(x), exists));
     }
 }
