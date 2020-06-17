@@ -1,40 +1,18 @@
+use nom::{InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, digit1, multispace0};
 use nom::combinator::{all_consuming, map, map_res, opt};
-use nom::error::{convert_error, VerboseError, ErrorKind};
-use nom::{IResult, InputTakeAtPosition};
+use nom::error::{convert_error, ErrorKind, VerboseError};
 use nom::multi::{fold_many0, separated_list};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 
-use crate::formula::{Expression, HiFormula, Variable};
-use crate::formula::{BinOp, HiPredicate};
-use crate::name::Name;
+use crate::common::Name;
+use crate::highlevel::hiformula::{Expression, HiFormula};
+use crate::highlevel::hiformula::{BinOp, HiPredicate};
+use crate::solver::commands::{Command, SetDef};
 
 pub type NomResult<'a, Ret> = IResult<&'a str, Ret, VerboseError<&'a str>>;
-
-#[derive(Debug)]
-pub struct SetDef {
-    vars: Vec<Name>,
-    formula: HiFormula,
-}
-
-impl SetDef {
-    pub fn vars(&self) -> &[Name] {
-        &self.vars
-    }
-
-    pub fn formula(&self) -> &HiFormula {
-        &self.formula
-    }
-}
-
-
-#[derive(Debug)]
-pub enum Command {
-    SetDef(String, SetDef),
-    Call(String, Vec<String>)
-}
 
 fn integer(input: &str) -> NomResult<u64>
 {
@@ -69,7 +47,7 @@ fn atom(input: &str) -> NomResult<Expression> {
                 (name, Some(value)) => Expression::Mod(Box::new(Expression::Variable(Name::new(name))), value)
             }
         })
-        ))(input)
+    ))(input)
 }
 
 fn expr(input: &str) -> NomResult<Vec<Expression>> {
@@ -322,7 +300,7 @@ mod test {
             HiPredicate::BinOp(BinOp::Lt,
                                Expression::from_name(Name::new(x.clone())),
                                Expression::from_name(Name::new(y))),
-            ))
+        )),
         ));
         assert_eq!(f, HiFormula::ForAll(Name::Named(x), exists));
     }

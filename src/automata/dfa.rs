@@ -1,10 +1,10 @@
-
-
 use hashbrown;
-use crate::common::{StateId};
-use hashbrown::{HashSet, HashMap};
-use crate::nfa::{Transition, Nfa};
-use crate::table::{TransitionTable};
+use hashbrown::{HashMap, HashSet};
+
+use crate::common::StateId;
+
+use super::{Nfa, Transition};
+use super::TransitionTable;
 
 #[derive(Debug, Clone)]
 pub struct Dfa {
@@ -17,7 +17,7 @@ impl Dfa {
         assert_eq!(table.n_states(), accepting.len());
         Dfa {
             table,
-            accepting
+            accepting,
         }
     }
 
@@ -131,12 +131,12 @@ impl Dfa {
         accepting.resize(self.accepting.len(), false);
         accepting[0] = true;
 
-        let initial_states : HashSet<_> = self.accepting.iter().enumerate().filter_map(|(idx, a)| if *a { Some(idx as StateId) } else { None }).collect();
+        let initial_states: HashSet<_> = self.accepting.iter().enumerate().filter_map(|(idx, a)| if *a { Some(idx as StateId) } else { None }).collect();
         Nfa::new(table, accepting, initial_states)
     }
 
     pub fn test_input<I: Iterator<Item=usize>>(&self, word: I) -> bool {
-        let mut state : StateId = 0;
+        let mut state: StateId = 0;
         for a in word {
             state = self.table.get_state(state)[a];
         }
@@ -151,7 +151,6 @@ impl Dfa {
             }
         }*/
         self.accepting[state as usize]
-
     }
 
     pub fn zero_suffix_closure(&mut self) {
@@ -160,7 +159,7 @@ impl Dfa {
             repeat = false;
             for (i, states) in self.table.states().enumerate() {
                 if self.accepting[i] {
-                   continue;
+                    continue;
                 }
                 let s = states[0];
                 if self.accepting[s as usize] {
@@ -175,9 +174,9 @@ impl Dfa {
         let n_states = self.accepting.len();
         assert!(n_states > 0);
         let asize = self.alphabet_size();
-        let mut partitions : Vec<StateId> = self.accepting.iter().map(|a| if *a { 0 } else { 1 }).collect();
+        let mut partitions: Vec<StateId> = self.accepting.iter().map(|a| if *a { 0 } else { 1 }).collect();
 
-        let mut target_ids : Vec<StateId> = vec![0; asize * n_states];
+        let mut target_ids: Vec<StateId> = vec![0; asize * n_states];
 
 
         let mut prev_ids = 0;
@@ -281,7 +280,7 @@ mod tests {
                       5, 7, // 5
                       6, 7, // 6
                       7, 0, // 7
-                    ];
+        ];
         let mut acc = vec![false; 8];
         acc[1] = true;
         acc[2] = true;

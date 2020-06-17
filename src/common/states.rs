@@ -1,6 +1,6 @@
-use std::hash::{Hasher, Hash};
-use hashbrown::HashSet;
+use std::hash::{Hash, Hasher};
 
+use hashbrown::HashSet;
 
 pub type StateId = u32;
 
@@ -31,10 +31,10 @@ impl Eq for StateSet {}
 
 impl Hash for StateSet {
     fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
+        where
+            H: Hasher,
     {
-        let mut h : StateId = 0;
+        let mut h: StateId = 0;
         for elm in &self.inner {
             h ^= *elm;
         }

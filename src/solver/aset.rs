@@ -1,11 +1,9 @@
-use crate::automaton::Automaton;
-use crate::nfa::{Transition, Nfa};
-use crate::table::TransitionTable;
-use crate::dfa::Dfa;
-use crate::name::Name;
 use hashbrown::HashMap;
-use crate::common::StateId;
-use crate::elements::{Element, cut, get_nth_element, number_of_elements};
+
+use crate::automata::{Automaton, Dfa, Nfa, Transition, TransitionTable};
+use crate::common::Name;
+
+use super::{cut, Element, get_nth_element, number_of_elements};
 
 #[derive(Debug, Clone)]
 pub struct AutomaticSet {
@@ -14,7 +12,6 @@ pub struct AutomaticSet {
 }
 
 impl AutomaticSet {
-
     pub fn singleton(track_name: Name, mut value: u64) -> AutomaticSet {
         let mut transitions = Vec::new();
         let mut state_id = 0;
@@ -56,7 +53,7 @@ impl AutomaticSet {
         ]);
         AutomaticSet {
             automaton: Automaton::Dfa(Dfa::new(table, vec![true, false, false])),
-            track_names: vec![name1, name2]
+            track_names: vec![name1, name2],
         }
     }
 
@@ -75,7 +72,7 @@ impl AutomaticSet {
         ]);
         AutomaticSet {
             automaton: Automaton::Dfa(Dfa::new(table, vec![true, false])),
-            track_names: vec![name1, name2]
+            track_names: vec![name1, name2],
         }
     }
 
@@ -88,13 +85,13 @@ impl AutomaticSet {
 
         let table = TransitionTable::new(3, vec![
             /* 000,  001,  010,  011,  100,  101,  110,  111, */
-               t(0), e(),  e(),  t(1),  e(),  t(0), t(0), e(),
-               e(),  t(1), t(1), e(),   t(0), e(),  e(),  t(1),
+            t(0), e(), e(), t(1), e(), t(0), t(0), e(),
+            e(), t(1), t(1), e(), t(0), e(), e(), t(1),
         ]);
 
         AutomaticSet {
             automaton: Automaton::Nfa(Nfa::new(table, vec![true, false], Nfa::simple_init())),
-            track_names: vec![name1, name2, name3]
+            track_names: vec![name1, name2, name3],
         }
     }
 
@@ -135,10 +132,10 @@ impl AutomaticSet {
             track_names: self.track_names.to_vec(),
             automaton: Automaton::Dfa(dfa1),
         },
-        AutomaticSet {
-            track_names: self.track_names.to_vec(),
-            automaton: Automaton::Dfa(dfa2),
-        })
+         AutomaticSet {
+             track_names: self.track_names.to_vec(),
+             automaton: Automaton::Dfa(dfa2),
+         })
     }
 
     pub fn neg(self) -> AutomaticSet {
@@ -281,7 +278,7 @@ impl AutomaticSet {
             nfa.zero_suffix_closure();
             AutomaticSet {
                 track_names,
-                automaton: Automaton::Nfa(nfa)
+                automaton: Automaton::Nfa(nfa),
             }
         } else {
             self
@@ -301,10 +298,11 @@ impl AutomaticSet {
 
 #[cfg(test)]
 mod tests {
+    use crate::highlevel::parser::parse_setdef;
+    use crate::solver::commands::build_set;
+    use crate::solver::iterate_elements;
+
     use super::*;
-    use crate::solver::build_set;
-    use crate::parser::parse_setdef;
-    use crate::elements::iterate_elements;
 
     fn collect_elements(dfa: &Dfa, limit: Option<usize>) -> Vec<Vec<usize>> {
         let mut result = Vec::new();
@@ -399,5 +397,4 @@ mod tests {
         let a = build_set(&parse_setdef("{ x, y | x == y + 13 or x == y + 11}"));
         assert_eq!(collect_elements(&a.cut(5, true).to_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2], vec![15, 2]]);
     }
-
 }

@@ -1,9 +1,9 @@
-use crate::words::{number_of_words, shortest_words, longest_words, Bound, number_of_words_zero_length, number_of_words_next_length};
-use crate::dfa::Dfa;
-use crate::nfa::{Nfa, Transition};
-use crate::common::StateId;
-use crate::table::TransitionTable;
 use itertools::Itertools;
+
+use crate::automata::{Bound, longest_words, number_of_words, number_of_words_next_length, number_of_words_zero_length, shortest_words};
+use crate::automata::{Dfa, Nfa, Transition};
+use crate::automata::TransitionTable;
+use crate::common::StateId;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Element {
@@ -11,7 +11,6 @@ pub struct Element {
 }
 
 impl Element {
-
     pub fn new(n_tracks: usize) -> Self {
         Element { values: vec![0; n_tracks] }
     }
@@ -76,27 +75,12 @@ impl Element {
     }
 }
 
-
-
-/*fn push_tracks(tracks: &mut Vec<usize>, symbol: usize) {
-    for (i, t) in tracks.iter_mut().enumerate() {
-        *t <<= 1;
-        *t |= (symbol >> i) & 1;
-    }
-}
-
-fn pop_tracks(tracks: &mut Vec<usize>) {
-    for t in tracks.iter_mut() {
-        *t >>= 1;
-    }
-}*/
-
 pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
 {
     let dfa = dfa.reverse().to_dfa();
     let number_of_words = number_of_words(&dfa);
     let transitions = dfa.get_state(0);
-    let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).fold1(|a,b| a + b);
+    let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).fold1(|a, b| a + b);
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
 
@@ -124,7 +108,8 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
         dfa: Dfa,
         short: Vec<Option<usize>>,
         long: Vec<Bound>,
-    };
+    }
+    ;
 
     let c_def = ComputationDef {
         dfa,
@@ -136,7 +121,8 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
         element: Element,
         limit: Option<usize>,
         callback: F,
-    };
+    }
+    ;
 
     let mut c_state = ComputationState {
         callback,
@@ -222,7 +208,7 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     let max = if let Bound::None = lengths[state as usize] {
         Bound::None
     } else {
-        let mut value : usize = 1;
+        let mut value: usize = 1;
         loop {
             let s = dfa.get_state(state);
             match (lengths[s[0] as usize], lengths[s[1] as usize]) {
@@ -292,7 +278,6 @@ pub fn cut(element: &Element) -> Nfa {
     nfa.to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
     nfa.to_dfa().reverse().to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
     nfa.to_dfa().reverse()
-
 }
 
 pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
@@ -362,12 +347,12 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
 
 #[cfg(test)]
 mod tests {
+    use crate::automata::{Transition, TransitionTable};
+    use crate::common::Name;
+    use crate::highlevel::parser::{parse_formula, parse_setdef};
+    use crate::solver::commands::build_set;
+
     use super::*;
-    use crate::parser::{parse_formula, parse_setdef};
-    use crate::name::Name;
-    use crate::solver::build_set;
-    use crate::nfa::Transition;
-    use crate::table::TransitionTable;
 
     fn collect_elements(dfa: &Dfa, limit: Option<usize>) -> Vec<Vec<usize>> {
         let mut result = Vec::new();

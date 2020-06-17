@@ -5,9 +5,9 @@ use std::io::{BufWriter, Write};
 use hashbrown::{HashMap, HashSet};
 use hashbrown::hash_map::Entry;
 
-use crate::aset::AutomaticSet;
-use crate::dfa::Dfa;
-use crate::elements::{Element, get_max_value, iterate_elements};
+use crate::automata::Dfa;
+use crate::solver::{Element, get_max_value, iterate_elements};
+use crate::solver::AutomaticSet;
 
 type Node = usize;
 type Edge = (Node, Node);
@@ -85,8 +85,8 @@ impl<'a> dot::GraphWalk<'a, Node, Edge> for Graph {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_setdef;
-    use crate::solver::evaluate_formula;
+    use crate::highlevel::parser::parse_setdef;
+    use crate::solver::eval::evaluate_formula;
 
     use super::*;
 

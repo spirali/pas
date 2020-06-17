@@ -1,14 +1,12 @@
-use crate::dfa::Dfa;
-use crate::nfa::Nfa;
+use super::{Dfa, Nfa};
 
 #[derive(Debug, Clone)]
 pub enum Automaton {
     Dfa(Dfa),
-    Nfa(Nfa)
+    Nfa(Nfa),
 }
 
 impl Automaton {
-
     pub fn to_nfa(self) -> Nfa {
         match self {
             Self::Dfa(dfa) => dfa.to_nfa(),
@@ -24,7 +22,7 @@ impl Automaton {
     }
 
     pub fn as_dfa(&self) -> Dfa {
-            match self {
+        match self {
             Self::Dfa(dfa) => dfa.clone(),
             Self::Nfa(nfa) => nfa.to_dfa(),
         }

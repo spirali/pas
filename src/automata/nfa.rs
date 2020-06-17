@@ -1,13 +1,16 @@
-
-use crate::dfa::{Dfa};
-use hashbrown::{HashSet, HashMap};
-use smallvec::{smallvec, SmallVec};
-use crate::common::{StateId, StateSet};
-use crate::table::TransitionTable;
-use std::path::Path;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
+
+use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
+
+use smallvec::{smallvec, SmallVec};
+
+use crate::common::{StateId, StateSet};
+
+use super::Dfa;
+use super::TransitionTable;
 
 #[derive(Debug, Default, Clone)]
 pub struct Transition {
@@ -15,7 +18,6 @@ pub struct Transition {
 }
 
 impl Transition {
-
     #[inline]
     pub fn empty() -> Transition {
         Transition {
@@ -56,7 +58,6 @@ pub struct Nfa {
 }
 
 impl Nfa {
-
     pub fn new(table: TransitionTable<Transition>, accepting: Vec<bool>, initial_states: HashSet<StateId>) -> Self {
         assert_eq!(table.n_states(), accepting.len());
         Nfa {
@@ -69,7 +70,7 @@ impl Nfa {
     pub fn simple_init() -> HashSet<StateId> {
         let mut init = HashSet::new();
         init.insert(0);
-        return init
+        return init;
     }
 
     pub fn to_dfa(&self) -> Dfa {
@@ -92,6 +93,7 @@ impl Nfa {
         self.table = self.table.add_track();
     }
 
+
     pub fn determinize(&self) -> Dfa {
         let asize = self.alphabet_size();
         let mut map = HashMap::new();
@@ -113,7 +115,7 @@ impl Nfa {
                 }
                 let fs = StateSet::new(new_state);
                 let id = map.get(&fs).map(|x| *x).unwrap_or_else(|| {
-                    let new_state : HashSet<StateId> = fs.inner().clone();
+                    let new_state: HashSet<StateId> = fs.inner().clone();
                     new_id += 1;
                     map.insert(fs, new_id);
                     accepting.push(new_state.iter().any(|s| self.accepting[*s as usize]));
@@ -173,13 +175,13 @@ impl Nfa {
             repeat = false;
             for (i, states) in self.table.states().enumerate() {
                 if self.accepting[i] {
-                   continue;
+                    continue;
                 }
                 for s in &states[0].states {
                     if self.accepting[*s as usize] {
                         self.accepting[i] = true;
                         repeat = true;
-                        break
+                        break;
                     }
                 }
             }
@@ -191,7 +193,6 @@ impl Nfa {
     }
 
     pub fn write_dot(&self, path: &Path, remove_sink: bool) -> std::io::Result<()> {
-
         let sink: Option<StateId> = if remove_sink {
             self.accepting.iter().enumerate().find(|(i, a)| {
                 !**a && self.table.get_state(*i as StateId).iter().all(|x| x.is_simple(*i as StateId)) && !self.initial_states.contains(&(*i as StateId))
@@ -207,13 +208,13 @@ impl Nfa {
             if Some(i as StateId) == sink {
                 continue;
             }
-            let shape = if *acc { "doublecircle" } else { "circle"};
+            let shape = if *acc { "doublecircle" } else { "circle" };
             let color = if self.initial_states.contains(&(i as StateId)) { "gray" } else { "none" };
-            file.write_all(format!("s{i}[label={i},shape={shape},fillcolor={color}, style=filled]\n", i=i, shape=shape, color=color).as_bytes())?;
+            file.write_all(format!("s{i}[label={i},shape={shape},fillcolor={color}, style=filled]\n", i = i, shape = shape, color = color).as_bytes())?;
         }
         let mut pairs = Vec::new();
 
-        let symbol_strings : Vec<String> = (0..self.table.alphabet_size()).map(|x| format!("{1:00$b}", self.table.n_tracks(), x)).collect();
+        let symbol_strings: Vec<String> = (0..self.table.alphabet_size()).map(|x| format!("{1:00$b}", self.table.n_tracks(), x)).collect();
 
         for (i, states) in self.table.states().enumerate() {
             if Some(i as StateId) == sink {
@@ -232,7 +233,6 @@ impl Nfa {
             for (target, symbols) in &pairs.iter().group_by(|p| p.0) {
                 let label = symbols.map(|x| &symbol_strings[x.1]).join(",");
                 file.write_all(format!("s{} -> s{} [label=\"{}\"]\n", i, target, label).as_bytes())?;
-
             };
             //
         }

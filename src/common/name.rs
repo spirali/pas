@@ -1,6 +1,7 @@
 use std::cell::Cell;
-use nom::lib::std::fmt::Formatter;
 use std::fmt;
+
+use nom::lib::std::fmt::Formatter;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum Name {
@@ -43,8 +44,8 @@ impl Name {
     #[inline]
     pub fn is_tmp(&self) -> bool {
         match self {
-           Self::Tmp(_) => true,
-           _ => false,
+            Self::Tmp(_) => true,
+            _ => false,
         }
     }
 }
@@ -52,9 +53,9 @@ impl Name {
 impl fmt::Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(&match self {
-               Self::Named(s) => format!("{}", &s),
-               Self::Unnamed(s) => format!("${}", &s),
-               Self::Tmp(s) => format!("#{}", &s),
+            Self::Named(s) => format!("{}", &s),
+            Self::Unnamed(s) => format!("${}", &s),
+            Self::Tmp(s) => format!("#{}", &s),
         })
     }
 }

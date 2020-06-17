@@ -1,35 +1,21 @@
 use std::fs;
-use std::fs::File;
-use std::io::BufWriter;
 use std::path::Path;
 use std::str::FromStr;
 
 use structopt::StructOpt;
 
-use crate::aset::AutomaticSet;
-use crate::elements::{get_max_value, iterate_elements, number_of_elements};
-use crate::parser::{parse_exact, setdef, unwrap_nom, commands, Command};
+use crate::highlevel::parser::{commands, parse_exact, setdef, unwrap_nom};
 use crate::render::dot::render_set_dot;
 use crate::render::png::render_set_png;
-use crate::solver::{build_set, Context};
+use crate::solver::aset::AutomaticSet;
+use crate::solver::commands::{Command, Context};
+use crate::solver::elements::{get_max_value, iterate_elements, number_of_elements};
 
-mod common;
-mod name;
-mod table;
-mod dfa;
-mod nfa;
-mod automaton;
-mod aset;
-mod formula;
-mod solver;
-mod parser;
-mod words;
-mod elements;
-
-mod render {
-    pub(crate) mod png;
-    pub(crate) mod dot;
-}
+pub mod common;
+pub mod solver;
+pub mod automata;
+pub mod highlevel;
+pub mod render;
 
 
 #[derive(Debug)]
@@ -49,32 +35,9 @@ impl FromStr for RenderFormat {
     }
 }
 
-/*#[derive(Debug, StructOpt)]
-enum Command {
-    NfaDot {
-        output: String,
-        #[structopt(long)]
-        with_sink: bool,
-        #[structopt(long)]
-        reverse: bool,
-    },
-    Render {
-        format: RenderFormat,
-        output: String,
-    },
-    Iterate,
-    Split {
-        output: String,
-    },
-    Stats,
-    IsEmpty,
-}*/
-
 #[derive(Debug, StructOpt)]
 struct Opts {
     file: String,
-    /*#[structopt(subcommand)]
-    command: Command,*/
 }
 
 fn read_file(path: &Path) -> Vec<Command> {
@@ -92,62 +55,4 @@ fn main() {
     for cmd in cmds {
         context.eval(cmd);
     }
-
-    /*
-    match opts.command {
-        Command::NfaDot { output, with_sink, reverse } => {
-            let nfa = if reverse {
-                aset.to_dfa().reverse().determinize().minimize().to_nfa()
-            } else {
-                aset.to_nfa()
-            };
-            nfa.write_dot(Path::new(&output), !with_sink).unwrap()
-        }
-        Command::Stats => {
-            print_stats(aset);
-        }
-        Command::IsEmpty => {
-            println!("Empty: {}", aset.is_empty());
-        }
-        Command::Render { output, format } => {
-            let dfa = aset.to_dfa();
-            let file = File::create(output).unwrap();
-            let mut writer = BufWriter::new(file);
-            match format {
-                RenderFormat::Png => render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer),
-                RenderFormat::Dot => render_set_dot(&dfa, &mut writer),
-            }
-        }
-        Command::Iterate => {
-            let dfa = aset.to_dfa();
-            iterate_elements(&dfa, None, |element| {
-                println!("{:?}", element.values);
-            })
-        }
-        Command::Split { output } => {
-            let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 128, 128], [128, 128, 0]];
-            //let colors = &[[255, 0, 0], [0, 255, 0], [0, 0, 255]];
-            let count = colors.len();
-            let size = aset.size().unwrap() / count;
-            println!("TARGET SIZE {} {}", size, aset.size().unwrap());
-            let mut aset = aset;
-
-            let mut res = Vec::new();
-            for _ in 0..count - 1 {
-                let (a, b) = aset.cut2(size);
-                println!("ASIZE {:?} {:?}", a.size(), b.size());
-                res.push(a.to_dfa());
-                aset = b;
-            }
-            res.push(aset.to_dfa());
-
-            for r in &res {
-                println!("SIZE: {}", number_of_elements(r).unwrap());
-            }
-
-            let file = File::create(output).unwrap();
-            let mut writer = BufWriter::new(file);
-            render_set_png(&res.iter().collect::<Vec<_>>().as_slice(), colors, &mut writer);
-        }
-    };*/
 }

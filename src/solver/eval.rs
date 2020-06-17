@@ -1,78 +1,15 @@
-use crate::aset::AutomaticSet;
-use crate::formula::{LoFormula, LoPredicate};
-use crate::parser::{SetDef, Command};
-use hashbrown::HashSet;
-use crate::name::Name;
-use crate::elements::get_max_value;
-use crate::render::png::render_set_png;
-use std::io::BufWriter;
 use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 
-#[derive(Debug)]
-pub struct Context {
-    sets: hashbrown::HashMap<Name, AutomaticSet>
-}
+use hashbrown::HashSet;
 
-impl Context {
-    pub fn new() -> Self {
-        Context {
-            sets: Default::default()
-        }
-    }
+use crate::common::Name;
+use crate::render::png::render_set_png;
 
-    pub fn get_set(&self, name: &Name) -> &AutomaticSet {
-        self.sets.get(&name).unwrap_or_else(|| {
-           panic!("Set '{:?}' not defined", name);
-        })
-    }
-
-    pub fn eval(&mut self, cmd: Command) {
-        match cmd {
-            Command::SetDef(name, setdef) => {
-                let name = Name::new(name);
-                self.sets.insert(name, build_set(&setdef));
-            },
-            Command::Call(name, args) => {
-                match name.as_str() {
-                    "render_png" => {
-                        let mut args = args.into_iter();
-                        let set_name = Name::new(args.next().unwrap());
-                        let output = format!("{}.png", args.next().unwrap());
-                        let dfa = self.get_set(&set_name).as_dfa();
-
-                        let file = File::create(output).unwrap();
-                        let mut writer = BufWriter::new(file);
-                        render_set_png(&[&dfa], &[[255, 0, 0]], &mut writer);
-                    },
-                    "nfa_dot" => {
-                        let mut args = args.into_iter();
-                        let set_name = Name::new(args.next().unwrap());
-                        let output = format!("{}.dot", args.next().unwrap());
-                        let nfa = self.get_set(&set_name).clone().to_nfa();
-                        nfa.write_dot(Path::new(&output), true).unwrap();
-                    }
-                    "stats" => {
-                        print_stats(self.get_set(&Name::new(args.into_iter().next().unwrap())))
-                    },
-                    name => {
-                        panic!("Unknown command '{}'", name);
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn print_stats(aset: &AutomaticSet) {
-    let names = aset.track_names().to_vec();
-    let dfa = aset.as_dfa();
-    println!("DFA size: {}", dfa.n_states());
-    let nfa = dfa.to_nfa();
-    for (i, name) in names.iter().enumerate() {
-        println!("Max {:?}: {}", name, get_max_value(&nfa, i).to_string());
-    }
-}
+use super::{LoFormula, LoPredicate};
+use super::AutomaticSet;
+use super::get_max_value;
 
 pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
     match pred {
@@ -95,31 +32,12 @@ pub fn evaluate_formula(formula: &LoFormula) -> AutomaticSet {
     }
 }
 
-pub fn build_set(set_def: &SetDef) -> AutomaticSet {
-    /* Check uniqueness of vars */
-    let mut uniq = HashSet::new();
-    assert!(set_def.vars().iter().all(|x| uniq.insert(x.clone())));
-
-    let formula = set_def.formula().make_lo_formula();
-    //dbg!(&formula);
-    let mut aset = evaluate_formula(&formula);
-
-    for name in formula.free_vars() {
-        if !uniq.contains(&name) {
-            aset = aset.exists(name.clone())
-        }
-    }
-
-    aset.ensure_dfa();
-    aset.order_tracks(set_def.vars());
-    aset
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::common::Name;
+    use crate::highlevel::parser::parse_formula;
+
     use super::*;
-    use crate::parser::parse_formula;
-    use crate::name::Name;
 
     #[test]
     fn test_eval_eq_formula() {
@@ -230,7 +148,6 @@ mod tests {
         let mut a = evaluate_formula(&f);
         assert!(a.test_input(&[("x", 0), ("y", 0)]));
         assert!(a.test_input(&[("x", 3), ("y", 11)]));
-
 
 
         let mut a = evaluate_formula(&f);

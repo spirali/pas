@@ -1,15 +1,14 @@
-
+use crate::automata::Transition;
 use crate::common::StateId;
-use crate::nfa::Transition;
 
 #[derive(Debug, Clone)]
-pub struct TransitionTable<T : Default + Clone> {
+pub struct TransitionTable<T: Default + Clone> {
     n_tracks: usize,
-    transitions: Vec<T>
+    transitions: Vec<T>,
 }
 
 
-impl<T : Default + Clone> TransitionTable<T> {
+impl<T: Default + Clone> TransitionTable<T> {
     pub fn new(n_tracks: usize, transitions: Vec<T>) -> Self {
         assert_eq!(transitions.len() % (1 << n_tracks), 0);
         TransitionTable {
@@ -119,7 +118,6 @@ impl TransitionTable<StateId> {
 }
 
 impl TransitionTable<Transition> {
-
     pub fn merge_first_track(&self) -> TransitionTable<Transition> {
         assert!(self.n_tracks > 0);
         let mut new_transitions = Vec::new();
@@ -154,9 +152,9 @@ mod tests {
     #[test]
     fn test_table_switch() {
         let data = vec![
-            1,2,3,4,5,6,7,8,
-            9,10,11,12,13,14,15,16,
-            17,18,19,20,21,22,23,24,
+            1, 2, 3, 4, 5, 6, 7, 8,
+            9, 10, 11, 12, 13, 14, 15, 16,
+            17, 18, 19, 20, 21, 22, 23, 24,
         ];
         let mut table = TransitionTable::new(3, data.clone());
         table.swap_tracks(1, 1);
@@ -172,25 +170,25 @@ mod tests {
             1 1 1 | 7
          */
         let data2 = vec![
-            1,3,2,4,5,7,6,8,
-            9,11,10,12,13,15,14,16,
-            17,19,18,20,21,23,22,24,
+            1, 3, 2, 4, 5, 7, 6, 8,
+            9, 11, 10, 12, 13, 15, 14, 16,
+            17, 19, 18, 20, 21, 23, 22, 24,
         ];
         table.swap_tracks(0, 1);
         assert_eq!(table.transitions, data2);
 
         let data = vec![
-            1,2,3,4,5,6,7,8,
+            1, 2, 3, 4, 5, 6, 7, 8,
         ];
         let data3 = vec![
-            1,2,5,6,3,4,7,8,
+            1, 2, 5, 6, 3, 4, 7, 8,
         ];
         let mut table = TransitionTable::new(3, data.clone());
         table.swap_tracks(1, 2);
         assert_eq!(table.transitions, data3);
 
         let data3 = vec![
-            1,5,3,7,2,6,4,8,
+            1, 5, 3, 7, 2, 6, 4, 8,
         ];
         let mut table = TransitionTable::new(3, data.clone());
         table.swap_tracks(2, 0);

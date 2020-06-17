@@ -1,10 +1,9 @@
-use crate::dfa::Dfa;
-use crate::nfa::Nfa;
-use crate::common::{StateId};
 use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
-use crate::words::Bound::Finite;
 
+use crate::common::StateId;
+
+use super::{Dfa, Nfa};
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Copy)]
 pub enum Bound {
@@ -14,7 +13,6 @@ pub enum Bound {
 }
 
 impl Bound {
-
     #[inline]
     pub fn increase(&self) -> Bound {
         match self {
@@ -75,7 +73,7 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();
         for s in &s_current {
-            let mut length : Bound = dfa.get_state(*s).iter().map(|c| output[*c as usize]).max().unwrap().increase();
+            let mut length: Bound = dfa.get_state(*s).iter().map(|c| output[*c as usize]).max().unwrap().increase();
             if dfa.is_accepting(*s) {
                 length = length.max(Bound::Finite(0))
             }
@@ -121,7 +119,7 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();
         for s in &s_current {
-            let mut size : usize = dfa.get_state(*s).iter().map(|c| output[*c as usize].unwrap()).sum();
+            let mut size: usize = dfa.get_state(*s).iter().map(|c| output[*c as usize].unwrap()).sum();
             if dfa.is_accepting(*s) {
                 size += 1;
             }
@@ -174,13 +172,12 @@ pub fn number_of_words_next_length(dfa: &Dfa, prev: &Vec<usize>) -> Vec<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::parser::{parse_formula, parse_setdef};
-    use crate::name::Name;
-    use crate::solver::build_set;
-    use crate::nfa::Transition;
-    use crate::table::TransitionTable;
+    use crate::automata::TransitionTable;
+    use crate::common::Name;
+    use crate::highlevel::parser::{parse_formula, parse_setdef};
+    use crate::solver::commands::build_set;
 
+    use super::*;
 
     #[test]
     fn test_longests_words() {
