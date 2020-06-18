@@ -26,7 +26,7 @@ pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
 pub fn evaluate_formula(formula: &LoFormula) -> AutomaticSet {
     match formula {
         LoFormula::Predicate(pred) => evaluate_predicate(pred),
-        LoFormula::Or(f1, f2) => evaluate_formula(f1).union(evaluate_formula(f2)),
+        LoFormula::Or(fs) => evaluate_formula(&fs.0).union(evaluate_formula(&fs.1)),
         LoFormula::Neg(f) => evaluate_formula(f).neg(),
         LoFormula::Exists(name, f) => evaluate_formula(f).exists(name.clone()),
     }
@@ -180,6 +180,7 @@ mod tests {
     #[test]
     fn test_eval_is_empty() {
         let mut a = evaluate_formula(&parse_formula("x < 10 and x > 10").make_lo_formula());
+        //a.make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/xxx.dot"), false).unwrap();
         assert!(a.is_empty());
     }
 

@@ -85,7 +85,7 @@ impl LoPredicate {
 pub enum LoFormula {
     Predicate(LoPredicate),
     Neg(Box<LoFormula>),
-    Or(Box<LoFormula>, Box<LoFormula>),
+    Or(Box<(LoFormula, LoFormula)>),
     Exists(Name, Box<LoFormula>),
 }
 
@@ -105,7 +105,7 @@ impl LoFormula {
             (_, LoFormula::Predicate(LoPredicate::True)) => LoFormula::Predicate(LoPredicate::True),
             (LoFormula::Predicate(LoPredicate::False), x) => x,
             (x, LoFormula::Predicate(LoPredicate::False)) => x,
-            (x, y) => LoFormula::Or(Box::new(x), Box::new(y))
+            (x, y) => LoFormula::Or(Box::new((x, y)))
         }
     }
 
@@ -133,7 +133,7 @@ impl LoFormula {
         match self {
             Self::Predicate(p) => 1,
             Self::Neg(f) | Self::Exists(_, f) => f.size() + 1,
-            Self::Or(f1, f2) => f1.size() + f2.size() + 1,
+            Self::Or(fs) => fs.0.size() + fs.1.size() + 1,
         }
     }
 
@@ -141,7 +141,7 @@ impl LoFormula {
         match self {
             Self::Predicate(p) => 1,
             Self::Neg(f) | Self::Exists(_, f) => f.depth() + 1,
-            Self::Or(f1, f2) => f1.depth().max(f2.depth()) + 1,
+            Self::Or(fs) => fs.0.depth().max(fs.1.depth()) + 1,
         }
     }
 
@@ -149,9 +149,9 @@ impl LoFormula {
         match self {
             Self::Predicate(p) => p.free_vars(),
             Self::Neg(f) => f.free_vars(),
-            Self::Or(f1, f2) => {
-                let mut vars = f1.free_vars();
-                vars.extend(f2.free_vars());
+            Self::Or(fs) => {
+                let mut vars = fs.0.free_vars();
+                vars.extend(fs.1.free_vars());
                 vars
             }
             Self::Exists(name, f) => {
@@ -166,8 +166,8 @@ impl LoFormula {
         match self {
             Self::Predicate(p) => Self::Predicate(p.rename_free_var(name_from, name_to)),
             Self::Neg(f) => Self::Neg(Box::new(f.rename_free_var(name_from, name_to))),
-            Self::Or(f1, f2) => {
-                Self::Or(Box::new(f1.rename_free_var(name_from, name_to)), Box::new(f2.rename_free_var(name_from, name_to)))
+            Self::Or(fs) => {
+                Self::Or(Box::new((fs.0.rename_free_var(name_from, name_to), fs.1.rename_free_var(name_from, name_to))))
             }
             Self::Exists(name, f) if &name != name_from => Self::Exists(name, Box::new(f.rename_free_var(name_from, name_to))),
             x @ Self::Exists(_, _) => x,

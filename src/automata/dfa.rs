@@ -144,7 +144,7 @@ impl Dfa {
         self.accepting[state as usize]
     }
 
-    pub fn zero_suffix_closure(&mut self) {
+    /*pub fn zero_suffix_closure(&mut self) {
         let mut repeat = true;
         while repeat {
             repeat = false;
@@ -159,7 +159,7 @@ impl Dfa {
                 }
             }
         }
-    }
+    }*/
 
     pub fn minimize(&self) -> Self {
         let n_states = self.accepting.len();

@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 
 use crate::automata::{Automaton, Dfa, Nfa, Transition, TransitionTable};
-use crate::common::Name;
+use crate::common::{Name, iterate_bits_no_lz};
 
 use super::{cut, Element, get_nth_element, number_of_elements};
 
@@ -17,27 +17,26 @@ impl AutomaticSet {
         let mut transitions = Vec::new();
         let mut state_id = 0;
 
-        while value > 0 {
+        for bit in iterate_bits_no_lz(value) {
             state_id += 1;
-            if value & 1 == 0 {
-                transitions.push(Transition::simple(state_id));
+            if bit {
                 transitions.push(Transition::empty());
+                transitions.push(Transition::simple(state_id));
             } else {
-                transitions.push(Transition::empty());
                 transitions.push(Transition::simple(state_id));
+                transitions.push(Transition::empty());
             }
-            value >>= 1;
         }
-
-        transitions.push(Transition::simple(state_id));
         transitions.push(Transition::empty());
+        transitions.push(Transition::empty());
+        transitions[0] = Transition::simple(0);
 
         let mut accepting = Vec::new();
         accepting.resize(state_id as usize + 1, false);
         accepting[state_id as usize] = true;
 
         let nfa = Nfa::new(TransitionTable::new(1, transitions), accepting, Nfa::simple_init());
-
+        //nfa.write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
         AutomaticSet {
             automaton: Automaton::Nfa(nfa),
             track_names: vec![track_name],
@@ -48,8 +47,9 @@ impl AutomaticSet {
         /* name1 * 2 = name2 */
         assert_ne!(name1, name2);
         let table = TransitionTable::new(2, vec![
-            0, 1, 2, 2,
-            2, 2, 0, 1,
+          /*00,01,10,11*/
+            0, 2, 1, 2,
+            2, 0, 2, 1,
             2, 2, 2, 2,
         ]);
         AutomaticSet {
@@ -85,9 +85,13 @@ impl AutomaticSet {
         let e = Transition::empty;
 
         let table = TransitionTable::new(3, vec![
-            /* 000,  001,  010,  011,  100,  101,  110,  111, */
+            /*BACKWARD
             t(0), e(), e(), t(1), e(), t(0), t(0), e(),
-            e(), t(1), t(1), e(), t(0), e(), e(), t(1),
+            e(), t(1), t(1), e(), t(0), e(), e(), t(1),*/
+
+            /* 000,  001,  010,  011,  100,  101,  110,  111, */
+            t(0),   e(),  e(), e(), t(1), t(0), t(0), e(),
+            e(),    t(1),  t(1), t(0), e(), e(), e(), t(1),
         ]);
 
         AutomaticSet {
@@ -245,6 +249,7 @@ impl AutomaticSet {
             }
             tape.push(v as usize);
         }
+        tape.reverse();
         let dfa = self.automaton.ensure_dfa();
         dfa.test_input(tape.into_iter())
     }
@@ -260,7 +265,8 @@ impl AutomaticSet {
             track_names.remove(0);
             let mut nfa = self.automaton.into_nfa();
             nfa.merge_first_track();
-            nfa.zero_suffix_closure();
+            //nfa.zero_suffix_closure();
+            nfa.zero_prefix_fix();
             AutomaticSet {
                 track_names,
                 automaton: Automaton::Nfa(nfa),
@@ -301,6 +307,7 @@ mod tests {
             r.push(number & 1);
             number >>= 1;
         }
+        r.reverse();
         r
     }
 
@@ -311,6 +318,19 @@ mod tests {
             number1 >>= 1;
             number2 >>= 1;
         }
+        r.reverse();
+        r
+    }
+
+    fn number_to_word3(mut number1: usize, mut number2: usize, mut number3: usize) -> Vec<usize> {
+        let mut r = Vec::new();
+        while number1 > 0 || number2 > 0 || number3 > 0 {
+            r.push((number1 & 1) + ((number2 & 1) << 1) + ((number3 & 1) << 2));
+            number1 >>= 1;
+            number2 >>= 1;
+            number3 >>= 1;
+        }
+        r.reverse();
         r
     }
 
@@ -325,6 +345,7 @@ mod tests {
         let v = 0b010101100110;
         let aset = AutomaticSet::singleton(Name::from_str("x"), v as u64);
         let dfa = aset.into_dfa();
+        //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
         assert!(!dfa.test_input(Vec::<usize>::new().into_iter()));
         assert!(dfa.test_input(number_to_word(v).into_iter()));
         assert!(!dfa.test_input(number_to_word(v + 1).into_iter()));
@@ -363,9 +384,26 @@ mod tests {
         let m = Name::from_str("y");
         let aset1 = AutomaticSet::double(n.clone(), m.clone());
         let dfa = aset1.into_dfa();
+        //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/x.dot"), false).unwrap();
         for i in 0..51 {
             for j in 0..71 {
                 assert_eq!(dfa.test_input(number_to_word2(i, j).into_iter()), i * 2 == j);
+            }
+        }
+    }
+
+    #[test]
+    fn test_addition() {
+        let x = Name::from_str("x");
+        let y = Name::from_str("y");
+        let z = Name::from_str("z");
+        let aset1 = AutomaticSet::addition(x, y, z);
+        let dfa = aset1.into_dfa();
+        for i in 0..16 {
+            for j in 0..12 {
+                for r in 0..25 {
+                    assert_eq!(dfa.test_input(number_to_word3(i, j, r).into_iter()), i + j == r);
+                }
             }
         }
     }

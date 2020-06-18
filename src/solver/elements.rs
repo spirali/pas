@@ -77,7 +77,7 @@ impl Element {
 
 pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
 {
-    let dfa = dfa.reverse().make_dfa();
+    //let dfa = dfa.reverse().make_dfa();
     let number_of_words = number_of_words(&dfa);
     let transitions = dfa.get_row(0);
     let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).fold1(|a, b| a + b);
@@ -89,27 +89,28 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
         return;
     }
 
-    let dfa = dfa.reverse().make_dfa();
+    //let dfa = dfa.reverse().make_dfa();
 
     let n_tracks = dfa.n_tracks();
     if n_tracks == 0 {
         todo!()
     }
 
-    let short = shortest_words(&dfa);
-    let long = longest_words(&dfa);
+    dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/it.dot"), false).unwrap();
+
+    let short = shortest_words(dfa);
+    let long = longest_words(dfa);
 
     //let mut stack = Vec::new();
     let mut element = Element::new(dfa.n_tracks());
 
-    //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
 
-    struct ComputationDef {
-        dfa: Dfa,
+
+    struct ComputationDef<'a> {
+        dfa: &'a Dfa,
         short: Vec<Option<usize>>,
         long: Vec<Bound>,
-    }
-    ;
+    };
 
     let c_def = ComputationDef {
         dfa,
@@ -196,9 +197,11 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
 pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     let mut nfa = nfa.clone();
     nfa.merge_other_tracks(track_id);
+    nfa.zero_prefix_fix();
     let mut dfa = nfa.make_dfa();
-    dfa.zero_suffix_closure();
-    let dfa = dfa.reverse().make_dfa();
+    //dfa.zero_suffix_closure();
+
+    //let dfa = dfa.reverse().make_dfa();
     let mut lengths = longest_words(&dfa);
 
     let mut state = dfa.get_row(0)[1];
@@ -275,9 +278,9 @@ pub fn cut(element: &Element) -> Nfa {
 
     let nfa = Nfa::new(TransitionTable::new(element.n_tracks(), data), accepting, Nfa::simple_init());
     nfa.write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
-    nfa.make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
-    nfa.make_dfa().reverse().make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
-    nfa.make_dfa().reverse()
+    //nfa.make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
+    //nfa.make_dfa().reverse().make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
+    nfa
 }
 
 pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
@@ -290,7 +293,7 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
         nth_element -= 1;
     }
 
-    let dfa = dfa.reverse().make_dfa();
+    //let dfa = dfa.reverse().make_dfa();
 
     let mut target_len = 0;
     let mut lengths = vec![number_of_words_zero_length(&dfa)];

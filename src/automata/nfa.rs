@@ -161,7 +161,7 @@ impl Nfa {
         }
     }
 
-    pub fn zero_suffix_closure(&mut self) {
+    /*pub fn zero_suffix_closure(&mut self) {
         let mut repeat = true;
         while repeat {
             repeat = false;
@@ -177,6 +177,26 @@ impl Nfa {
                     }
                 }
             }
+        }
+    }*/
+
+    pub fn zero_prefix_fix(&mut self) {
+        if self.n_tracks() == 0 {
+            return;
+        }
+        let mut discover = self.initial_states.clone();
+        let mut new = hashbrown::HashSet::new();
+        while !discover.is_empty() {
+            for s in &discover {
+                let tr = self.table.get_row(*s);
+                for s2 in &tr[0].states {
+                    if self.initial_states.insert(*s2) {
+                        new.insert(*s2);
+                    }
+                }
+            }
+            discover.clear();
+            std::mem::swap(&mut discover, &mut new);
         }
     }
 
