@@ -1,13 +1,10 @@
 use std::borrow::Cow;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
-use hashbrown::{HashMap, HashSet};
-use hashbrown::hash_map::Entry;
+use hashbrown::HashMap;
 
 use crate::automata::Dfa;
-use crate::solver::{Element, get_max_value, iterate_elements};
-use crate::solver::AutomaticSet;
+use crate::solver::iterate_elements;
 
 type Node = usize;
 type Edge = (Node, Node);
@@ -100,7 +97,7 @@ mod tests {
 
     #[test]
     fn render_1d_loops() {
-        let mut dfa = make_dfa("{ x, y | x < 10 and y < 10 and x == y }");
+        let dfa = make_dfa("{ x, y | x < 10 and y < 10 and x == y }");
         let mut output = Vec::new();
         render_set_dot(&dfa, &mut output);
         assert_eq!(String::from_utf8(output).unwrap(), r#"digraph dfa {
@@ -120,7 +117,7 @@ mod tests {
 
     #[test]
     fn render_2d_grid() {
-        let mut dfa = make_dfa("{x, y, a, b | a < 4 and b < 4 and x < 4 and y < 4 and (x + 1 == a and y == b or x == a and y + 1 == b)}");
+        let dfa = make_dfa("{x, y, a, b | a < 4 and b < 4 and x < 4 and y < 4 and (x + 1 == a and y == b or x == a and y + 1 == b)}");
         let mut output = Vec::new();
         render_set_dot(&dfa, &mut output);
         assert_eq!(String::from_utf8(output).unwrap(), r#"digraph dfa {

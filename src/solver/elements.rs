@@ -84,7 +84,7 @@ pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
 
-pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>, mut callback: F) {
+pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, limit: Option<usize>, callback: F) {
     if let Some(0) = limit {
         return;
     }
@@ -102,7 +102,7 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
     let long = longest_words(dfa);
 
     //let mut stack = Vec::new();
-    let mut element = Element::new(dfa.n_tracks());
+    let element = Element::new(dfa.n_tracks());
 
 
 
@@ -110,7 +110,8 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
         dfa: &'a Dfa,
         short: Vec<Option<usize>>,
         long: Vec<Bound>,
-    };
+    }
+    ;
 
     let c_def = ComputationDef {
         dfa,
@@ -198,11 +199,11 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     let mut nfa = nfa.clone();
     nfa.merge_other_tracks(track_id);
     nfa.zero_prefix_fix();
-    let mut dfa = nfa.make_dfa();
+    let dfa = nfa.make_dfa();
     //dfa.zero_suffix_closure();
 
     //let dfa = dfa.reverse().make_dfa();
-    let mut lengths = longest_words(&dfa);
+    let lengths = longest_words(&dfa);
 
     let mut state = dfa.get_row(0)[1];
 
@@ -243,7 +244,7 @@ pub fn cut(element: &Element) -> Nfa {
     let length = element.length();
     let a_size = element.alphabet_size();
 
-    for i in (0..length) {
+    for i in 0..length {
         let sym = element.get_symbol(length - i - 1);
         let j = i + 1;
 
@@ -350,9 +351,7 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
 
 #[cfg(test)]
 mod tests {
-    use crate::automata::{Transition, TransitionTable};
-    use crate::common::Name;
-    use crate::highlevel::parser::{parse_formula, parse_setdef};
+    use crate::highlevel::parser::parse_setdef;
     use crate::solver::commands::build_set;
 
     use super::*;
@@ -492,7 +491,7 @@ mod tests {
         let def = "{ x, y | x < 500 and y < 500 and ((x < 100 or x > 400) and 10 * z == y or (y + 100 < x and x < 400) or ((x > 240 and x < 260 and y > 240 and y < 290 ))) }";
         let a = build_set(&parse_setdef(def));
 
-        let (c, d) = a.cut2(16);
+        let (c, _d) = a.cut2(16);
         assert_eq!(number_of_elements(&c.into_dfa()), Some(17));
 
 

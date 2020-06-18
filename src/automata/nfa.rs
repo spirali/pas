@@ -204,7 +204,7 @@ impl Nfa {
         let sink: Option<StateId> = if remove_sink {
             self.accepting.iter().enumerate().find(|(i, a)| {
                 !**a && self.table.get_row(*i as StateId).iter().all(|x| x.is_simple(*i as StateId)) && !self.initial_states.contains(&(*i as StateId))
-            }).map(|(i, a)| i as StateId)
+            }).map(|(i, _a)| i as StateId)
         } else {
             None
         };

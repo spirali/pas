@@ -1,4 +1,3 @@
-
 struct BitIterator {
     value: u64,
     count: u32,
@@ -9,7 +8,7 @@ impl Iterator for BitIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.count == 0 {
-            return None
+            return None;
         }
         self.count -= 1;
         let result = (self.value & 1) == 1;
@@ -22,7 +21,7 @@ pub fn iterate_bits_no_lz(value: u64) -> impl Iterator<Item=bool> {
     let lz = value.leading_zeros();
     BitIterator {
         value: if value > 0 { value.reverse_bits() >> lz } else { 0 },
-        count: std::mem::size_of::<u64>() as u32 * 8 - lz
+        count: std::mem::size_of::<u64>() as u32 * 8 - lz,
     }
 }
 

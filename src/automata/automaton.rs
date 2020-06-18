@@ -7,7 +7,6 @@ pub enum Automaton {
 }
 
 impl Automaton {
-
     pub fn into_nfa(self) -> Nfa {
         match self {
             Self::Dfa(dfa) => dfa.to_nfa(),

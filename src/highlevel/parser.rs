@@ -1,7 +1,7 @@
 use nom::{InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, digit1, multispace0};
+use nom::character::complete::{digit1, multispace0};
 use nom::combinator::{all_consuming, map, map_res, opt};
 use nom::error::{convert_error, ErrorKind, VerboseError};
 use nom::multi::{fold_many0, separated_list};
@@ -202,7 +202,7 @@ pub fn unwrap_nom<'a, Ret>(input: &'a str, result: NomResult<'a, Ret>) -> (&'a s
     match result {
         Ok(data) => data,
         Err(e) => match e {
-            nom::Err::Incomplete(needed) => panic!("Incomplete input"),
+            nom::Err::Incomplete(_needed) => panic!("Incomplete input"),
             nom::Err::Error(e) | nom::Err::Failure(e) => panic!(convert_error(input, e))
         }
     }
@@ -267,7 +267,7 @@ mod test {
         let p4 = p("x == y");
 
         let f1 = p2.or(p3);
-        assert_eq!(Ok(("", p1.and((f1.and(p4))))), formula_or("x == 4 and (2 * x == 3 * y + 3 or x == y) and x == y"));
+        assert_eq!(Ok(("", p1.and(f1.and(p4)))), formula_or("x == 4 and (2 * x == 3 * y + 3 or x == y) and x == y"));
     }
 
     #[test]

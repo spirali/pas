@@ -1,9 +1,9 @@
 use hashbrown::HashMap;
 
 use crate::automata::{Automaton, Dfa, Nfa, Transition, TransitionTable};
-use crate::common::{Name, iterate_bits_no_lz};
+use crate::common::{iterate_bits_no_lz, Name};
 
-use super::{cut, Element, get_nth_element, number_of_elements};
+use super::{cut, get_nth_element, number_of_elements};
 
 #[derive(Debug, Clone)]
 pub struct AutomaticSet {
@@ -12,8 +12,7 @@ pub struct AutomaticSet {
 }
 
 impl AutomaticSet {
-
-    pub fn singleton(track_name: Name, mut value: u64) -> AutomaticSet {
+    pub fn singleton(track_name: Name, value: u64) -> AutomaticSet {
         let mut transitions = Vec::new();
         let mut state_id = 0;
 
@@ -47,7 +46,7 @@ impl AutomaticSet {
         /* name1 * 2 = name2 */
         assert_ne!(name1, name2);
         let table = TransitionTable::new(2, vec![
-          /*00,01,10,11*/
+            /*00,01,10,11*/
             0, 2, 1, 2,
             2, 0, 2, 1,
             2, 2, 2, 2,
@@ -90,8 +89,8 @@ impl AutomaticSet {
             e(), t(1), t(1), e(), t(0), e(), e(), t(1),*/
 
             /* 000,  001,  010,  011,  100,  101,  110,  111, */
-            t(0),   e(),  e(), e(), t(1), t(0), t(0), e(),
-            e(),    t(1),  t(1), t(0), e(), e(), e(), t(1),
+            t(0), e(), e(), e(), t(1), t(0), t(0), e(),
+            e(), t(1), t(1), t(0), e(), e(), e(), t(1),
         ]);
 
         AutomaticSet {
@@ -100,7 +99,7 @@ impl AutomaticSet {
         }
     }
 
-    pub fn cut(&self, nth_element: usize, lte: bool) -> AutomaticSet {
+    pub fn cut(&self, nth_element: usize, _lte: bool) -> AutomaticSet {
         let self_dfa = self.automaton.make_dfa();
         let element = get_nth_element(&self_dfa, nth_element);
         assert_eq!(element.n_tracks(), self.track_names.len());

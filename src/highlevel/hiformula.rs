@@ -89,7 +89,6 @@ impl HiPredicate {
             }
             HiPredicate::True => LoFormula::Predicate(LoPredicate::True),
             HiPredicate::False => LoFormula::Predicate(LoPredicate::False),
-            _ => unimplemented!(),
         }
     }
 
@@ -150,7 +149,7 @@ impl HiPredicate {
                         }
                         return (formula, out_var.unwrap());
                     }
-                    let mut fresh = Name::new_tmp();
+                    let fresh = Name::new_tmp();
                     formula = formula.and(LoPredicate::safe_double(exp_var.clone(), fresh.clone()).to_formula());
                     if close {
                         formula = formula.close_if_tmp(&exp_var);

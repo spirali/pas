@@ -4,12 +4,8 @@ use std::str::FromStr;
 
 use structopt::StructOpt;
 
-use crate::highlevel::parser::{commands, parse_exact, setdef, unwrap_nom};
-use crate::render::dot::render_set_dot;
-use crate::render::png::render_set_png;
-use crate::solver::aset::AutomaticSet;
+use crate::highlevel::parser::{commands, parse_exact, unwrap_nom};
 use crate::solver::commands::{Command, Context};
-use crate::solver::elements::{get_max_value, iterate_elements, number_of_elements};
 
 pub mod common;
 pub mod solver;

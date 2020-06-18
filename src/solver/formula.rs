@@ -131,7 +131,7 @@ impl LoFormula {
 
     pub fn size(&self) -> usize {
         match self {
-            Self::Predicate(p) => 1,
+            Self::Predicate(_p) => 1,
             Self::Neg(f) | Self::Exists(_, f) => f.size() + 1,
             Self::Or(fs) => fs.0.size() + fs.1.size() + 1,
         }
@@ -139,7 +139,7 @@ impl LoFormula {
 
     pub fn depth(&self) -> usize {
         match self {
-            Self::Predicate(p) => 1,
+            Self::Predicate(_p) => 1,
             Self::Neg(f) | Self::Exists(_, f) => f.depth() + 1,
             Self::Or(fs) => fs.0.depth().max(fs.1.depth()) + 1,
         }

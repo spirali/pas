@@ -1,15 +1,5 @@
-use std::fs::File;
-use std::io::BufWriter;
-use std::path::Path;
-
-use hashbrown::HashSet;
-
-use crate::common::Name;
-use crate::render::png::render_set_png;
-
 use super::{LoFormula, LoPredicate};
 use super::AutomaticSet;
-use super::get_max_value;
 
 pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
     match pred {
@@ -19,7 +9,6 @@ pub fn evaluate_predicate(pred: &LoPredicate) -> AutomaticSet {
         LoPredicate::Double(name1, name2) => AutomaticSet::double(name1.clone(), name2.clone()),
         LoPredicate::True => AutomaticSet::trivial(true),
         LoPredicate::False => AutomaticSet::trivial(false),
-        p => panic!("Not implemented predicate {:?}", p)
     }
 }
 
@@ -34,7 +23,6 @@ pub fn evaluate_formula(formula: &LoFormula) -> AutomaticSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::Name;
     use crate::highlevel::parser::parse_formula;
 
     use super::*;
@@ -150,7 +138,7 @@ mod tests {
         assert!(a.test_input(&[("x", 3), ("y", 11)]));
 
 
-        let mut a = evaluate_formula(&f);
+        let _a = evaluate_formula(&f);
         /*a.clone().to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/x.dot"), true).unwrap();
         iterate_words(&a.clone().to_dfa(), Some(10), |w|  println!("WW {:?}", w));*/
 

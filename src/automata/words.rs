@@ -1,9 +1,8 @@
-use hashbrown::{HashMap, HashSet};
-use itertools::Itertools;
+use hashbrown::HashSet;
 
 use crate::common::StateId;
 
-use super::{Dfa, Nfa};
+use super::Dfa;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Copy)]
 pub enum Bound {
@@ -48,7 +47,7 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
     let r_table = dfa.reverse_reachability();
     let mut s_next = Vec::<StateId>::with_capacity(dfa.n_states());
 
-    let mut process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
+    let process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
         for s3 in &r_table[state_id as usize] {
             if remaining[*s3 as usize] <= 1 {
                 assert_eq!(remaining[*s3 as usize], 1);
@@ -93,7 +92,7 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
     let r_table = dfa.reverse_reachability();
     let mut s_next = Vec::<StateId>::with_capacity(dfa.n_states());
 
-    let mut process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
+    let process = |state_id: StateId, s_next: &mut Vec<StateId>, remaining: &mut Vec<usize>| {
         for s3 in &r_table[state_id as usize] {
             if remaining[*s3 as usize] <= 1 {
                 assert_eq!(remaining[*s3 as usize], 1);
@@ -173,7 +172,6 @@ pub fn number_of_words_next_length(dfa: &Dfa, prev: &Vec<usize>) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use crate::automata::TransitionTable;
-    use crate::common::Name;
 
     use super::*;
 

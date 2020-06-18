@@ -1,9 +1,7 @@
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use crate::automata::Dfa;
 use crate::solver::{get_max_value, iterate_elements};
-use crate::solver::AutomaticSet;
 
 pub fn render_set_png<W: Write>(dfas: &[&Dfa], colors: &[[u8; 3]], writer: &mut W) {
     assert!(dfas.iter().all(|x| x.n_tracks() == 2));
