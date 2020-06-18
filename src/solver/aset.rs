@@ -12,6 +12,7 @@ pub struct AutomaticSet {
 }
 
 impl AutomaticSet {
+
     pub fn singleton(track_name: Name, mut value: u64) -> AutomaticSet {
         let mut transitions = Vec::new();
         let mut state_id = 0;
@@ -96,15 +97,15 @@ impl AutomaticSet {
     }
 
     pub fn cut(&self, nth_element: usize, lte: bool) -> AutomaticSet {
-        let self_dfa = self.automaton.as_dfa();
+        let self_dfa = self.automaton.make_dfa();
         let element = get_nth_element(&self_dfa, nth_element);
         assert_eq!(element.n_tracks(), self.track_names.len());
         let cut_nfa = cut(&element);
-        let neg_cut_nfa = cut_nfa.to_dfa().neg().to_nfa();
+        let neg_cut_nfa = cut_nfa.make_dfa().neg().to_nfa();
 
         let mut nfa = self_dfa.neg().to_nfa();
         nfa.join(&neg_cut_nfa);
-        let dfa = nfa.to_dfa().neg();
+        let dfa = nfa.make_dfa().neg();
 
         AutomaticSet {
             track_names: self.track_names.to_vec(),
@@ -113,20 +114,20 @@ impl AutomaticSet {
     }
 
     pub fn cut2(&self, nth_element: usize) -> (AutomaticSet, AutomaticSet) {
-        let self_dfa = self.automaton.as_dfa();
+        let self_dfa = self.automaton.make_dfa();
         let element = get_nth_element(&self_dfa, nth_element);
         assert_eq!(element.n_tracks(), self.track_names.len());
 
         let cut_nfa = cut(&element);
-        let neg_cut_nfa = cut_nfa.to_dfa().neg().to_nfa();
+        let neg_cut_nfa = cut_nfa.make_dfa().neg().to_nfa();
 
         let mut nfa1 = self_dfa.neg().to_nfa();
         let mut nfa2 = nfa1.clone();
         nfa1.join(&neg_cut_nfa);
-        let dfa1 = nfa1.to_dfa().neg();
+        let dfa1 = nfa1.make_dfa().neg();
 
         nfa2.join(&cut_nfa);
-        let dfa2 = nfa2.to_dfa().neg();
+        let dfa2 = nfa2.make_dfa().neg();
 
         (AutomaticSet {
             track_names: self.track_names.to_vec(),
@@ -141,7 +142,7 @@ impl AutomaticSet {
     pub fn neg(self) -> AutomaticSet {
         AutomaticSet {
             track_names: self.track_names,
-            automaton: Automaton::Dfa(self.automaton.to_dfa().neg()),
+            automaton: Automaton::Dfa(self.automaton.into_dfa().neg()),
         }
     }
 
@@ -151,8 +152,8 @@ impl AutomaticSet {
 
     pub fn union(mut self, mut other: AutomaticSet) -> AutomaticSet {
         self.synchronize_tracks(&mut other);
-        let mut a1 = self.automaton.to_nfa();
-        let a2 = other.automaton.to_nfa();
+        let mut a1 = self.automaton.into_nfa();
+        let a2 = other.automaton.into_nfa();
         a1.join(&a2);
         let r = AutomaticSet {
             track_names: self.track_names,
@@ -167,7 +168,7 @@ impl AutomaticSet {
     }
 
     pub fn size(&self) -> Option<usize> {
-        number_of_elements(&self.automaton.as_dfa())
+        number_of_elements(&self.automaton.make_dfa())
     }
 
     pub fn order_tracks(&mut self, names: &[Name]) {
@@ -194,21 +195,6 @@ impl AutomaticSet {
             }
         }
         other.order_tracks(self.track_names());
-
-        /*
-        for t in track_names {
-            if !other.track_names().contains(&t) {
-                other.add_track(t);
-            }
-        }
-
-        assert_eq!(self.track_names.len(), other.track_names.len());
-
-        for (i, name) in self.track_names.iter().enumerate() {
-            let p = other.track_names.iter().position(|t| t == name).unwrap();
-            other.swap_tracks(i, p);
-        }
-        debug_assert_eq!(self.track_names, other.track_names);*/
     }
 
     pub fn add_track(&mut self, name: Name) {
@@ -227,17 +213,16 @@ impl AutomaticSet {
         self.automaton.swap_tracks(index1, index2);
     }
 
-    pub fn to_dfa(self) -> Dfa {
-        self.automaton.to_dfa()
+    pub fn into_dfa(self) -> Dfa {
+        self.automaton.into_dfa()
     }
 
-    pub fn as_dfa(&self) -> Dfa {
-        self.automaton.as_dfa()
+    pub fn into_nfa(self) -> Nfa {
+        self.automaton.into_nfa()
     }
 
-
-    pub fn to_nfa(self) -> Nfa {
-        self.automaton.to_nfa()
+    pub fn make_dfa(&self) -> Dfa {
+        self.automaton.make_dfa()
     }
 
     pub fn test_input(&mut self, values: &[(&str, u64)]) -> bool {
@@ -273,7 +258,7 @@ impl AutomaticSet {
             self.swap_tracks(0, track);
             let mut track_names = self.track_names;
             track_names.remove(0);
-            let mut nfa = self.automaton.to_nfa();
+            let mut nfa = self.automaton.into_nfa();
             nfa.merge_first_track();
             nfa.zero_suffix_closure();
             AutomaticSet {
@@ -285,12 +270,12 @@ impl AutomaticSet {
         }
     }
 
-    pub fn ensure_dfa(&mut self) {
-        self.automaton.ensure_dfa();
+    pub fn ensure_dfa(&mut self) -> &Dfa {
+        self.automaton.ensure_dfa()
     }
 
-    pub fn is_empty(self) -> bool {
-        let dfa = self.to_dfa();
+    pub fn is_empty(&mut self) -> bool {
+        let dfa = self.ensure_dfa();
         dfa.n_states() == 1 && !dfa.is_accepting(0)
     }
 }
@@ -332,14 +317,14 @@ mod tests {
     #[test]
     fn test_singleton() {
         let aset = AutomaticSet::singleton(Name::from_str("x"), 0);
-        let dfa = aset.to_dfa();
+        let dfa = aset.into_dfa();
         assert!(dfa.test_input(Vec::<usize>::new().into_iter()));
         assert!(!dfa.test_input(vec![1].into_iter()));
         assert!(dfa.test_input(vec![0].into_iter()));
 
         let v = 0b010101100110;
         let aset = AutomaticSet::singleton(Name::from_str("x"), v as u64);
-        let dfa = aset.to_dfa();
+        let dfa = aset.into_dfa();
         assert!(!dfa.test_input(Vec::<usize>::new().into_iter()));
         assert!(dfa.test_input(number_to_word(v).into_iter()));
         assert!(!dfa.test_input(number_to_word(v + 1).into_iter()));
@@ -353,7 +338,7 @@ mod tests {
         let aset1 = AutomaticSet::singleton(Name::from_str("x"), 1);
         let aset2 = AutomaticSet::singleton(Name::from_str("x"), 10);
 
-        let dfa = aset1.union(aset2).to_dfa();
+        let dfa = aset1.union(aset2).into_dfa();
         assert!(dfa.test_input(number_to_word(1).into_iter()));
         assert!(!dfa.test_input(number_to_word(2).into_iter()));
         assert!(dfa.test_input(number_to_word(10).into_iter()));
@@ -363,7 +348,7 @@ mod tests {
     fn test_union2() {
         let aset1 = AutomaticSet::singleton(Name::from_str("x"), 1);
         let aset2 = AutomaticSet::singleton(Name::from_str("y"), 10);
-        let dfa = aset1.union(aset2).to_dfa();
+        let dfa = aset1.union(aset2).into_dfa();
         //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/x.dot"), false).unwrap();
         assert!(dfa.test_input(number_to_word2(1, 0).into_iter()));
         assert!(dfa.test_input(number_to_word2(1, 10).into_iter()));
@@ -377,7 +362,7 @@ mod tests {
         let n = Name::from_str("x");
         let m = Name::from_str("y");
         let aset1 = AutomaticSet::double(n.clone(), m.clone());
-        let dfa = aset1.to_dfa();
+        let dfa = aset1.into_dfa();
         for i in 0..51 {
             for j in 0..71 {
                 assert_eq!(dfa.test_input(number_to_word2(i, j).into_iter()), i * 2 == j);
@@ -388,13 +373,13 @@ mod tests {
     #[test]
     fn test_cut() {
         let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}"));
-        assert_eq!(collect_elements(&a.cut(0, true).to_dfa(), None), vec![vec![1]]);
-        assert_eq!(collect_elements(&a.cut(1, true).to_dfa(), None), vec![vec![1], vec![3]]);
+        assert_eq!(collect_elements(&a.cut(0, true).into_dfa(), None), vec![vec![1]]);
+        assert_eq!(collect_elements(&a.cut(1, true).into_dfa(), None), vec![vec![1], vec![3]]);
 
         let a = build_set(&parse_setdef("{ x | x > 5 and x < 20 and 2 * y == x}"));
-        assert_eq!(collect_elements(&a.cut(3, true).to_dfa(), None), vec![vec![6], vec![8], vec![10], vec![12]]);
+        assert_eq!(collect_elements(&a.cut(3, true).into_dfa(), None), vec![vec![6], vec![8], vec![10], vec![12]]);
 
         let a = build_set(&parse_setdef("{ x, y | x == y + 13 or x == y + 11}"));
-        assert_eq!(collect_elements(&a.cut(5, true).to_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2], vec![15, 2]]);
+        assert_eq!(collect_elements(&a.cut(5, true).into_dfa(), None), vec![vec![11, 0], vec![13, 0], vec![12, 1], vec![14, 1], vec![13, 2], vec![15, 2]]);
     }
 }

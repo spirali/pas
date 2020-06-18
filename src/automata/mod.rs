@@ -10,4 +10,3 @@ mod dfa;
 mod nfa;
 mod automaton;
 mod words;
-

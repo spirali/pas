@@ -64,7 +64,7 @@ impl Context {
                         let mut args = args.into_iter();
                         let set_name = Name::new(args.next().unwrap());
                         let output = format!("{}.png", args.next().unwrap());
-                        let dfa = self.get_set(&set_name).as_dfa();
+                        let dfa = self.get_set(&set_name).make_dfa();
 
                         let file = File::create(output).unwrap();
                         let mut writer = BufWriter::new(file);
@@ -74,7 +74,7 @@ impl Context {
                         let mut args = args.into_iter();
                         let set_name = Name::new(args.next().unwrap());
                         let output = format!("{}.dot", args.next().unwrap());
-                        let nfa = self.get_set(&set_name).clone().to_nfa();
+                        let nfa = self.get_set(&set_name).clone().into_nfa();
                         nfa.write_dot(Path::new(&output), true).unwrap();
                     }
                     "stats" => {
@@ -91,7 +91,7 @@ impl Context {
 
 fn print_stats(aset: &AutomaticSet) {
     let names = aset.track_names().to_vec();
-    let dfa = aset.as_dfa();
+    let dfa = aset.make_dfa();
     println!("DFA size: {}", dfa.n_states());
     let nfa = dfa.to_nfa();
     for (i, name) in names.iter().enumerate() {

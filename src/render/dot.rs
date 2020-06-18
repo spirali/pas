@@ -153,6 +153,6 @@ mod tests {
     }
 
     fn make_dfa(setdef: &str) -> Dfa {
-        evaluate_formula(&parse_setdef(setdef).formula().make_lo_formula()).to_dfa()
+        evaluate_formula(&parse_setdef(setdef).formula().make_lo_formula()).into_dfa()
     }
 }

@@ -7,24 +7,25 @@ pub enum Automaton {
 }
 
 impl Automaton {
-    pub fn to_nfa(self) -> Nfa {
+
+    pub fn into_nfa(self) -> Nfa {
         match self {
             Self::Dfa(dfa) => dfa.to_nfa(),
             Self::Nfa(nfa) => nfa,
         }
     }
 
-    pub fn to_dfa(self) -> Dfa {
+    pub fn into_dfa(self) -> Dfa {
         match self {
             Self::Dfa(dfa) => dfa,
-            Self::Nfa(nfa) => nfa.to_dfa(),
+            Self::Nfa(nfa) => nfa.make_dfa(),
         }
     }
 
-    pub fn as_dfa(&self) -> Dfa {
+    pub fn make_dfa(&self) -> Dfa {
         match self {
             Self::Dfa(dfa) => dfa.clone(),
-            Self::Nfa(nfa) => nfa.to_dfa(),
+            Self::Nfa(nfa) => nfa.make_dfa(),
         }
     }
 

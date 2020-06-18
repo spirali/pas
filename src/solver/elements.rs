@@ -77,9 +77,9 @@ impl Element {
 
 pub fn number_of_elements(dfa: &Dfa) -> Option<usize>
 {
-    let dfa = dfa.reverse().to_dfa();
+    let dfa = dfa.reverse().make_dfa();
     let number_of_words = number_of_words(&dfa);
-    let transitions = dfa.get_state(0);
+    let transitions = dfa.get_row(0);
     let count = transitions[1..].iter().filter_map(|s| number_of_words[*s as usize]).fold1(|a, b| a + b);
     count.map(|v| v + if dfa.is_accepting(0) { 1 } else { 0 })
 }
@@ -89,7 +89,7 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
         return;
     }
 
-    let dfa = dfa.reverse().to_dfa();
+    let dfa = dfa.reverse().make_dfa();
 
     let n_tracks = dfa.n_tracks();
     if n_tracks == 0 {
@@ -150,7 +150,7 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
             return false;
         }
         let new_length = length - 1;
-        let transitions = c_def.dfa.get_state(state);
+        let transitions = c_def.dfa.get_row(state);
         for a in 0..c_def.dfa.alphabet_size() {
             let new_state = transitions[a];
             match c_def.short[new_state as usize] {
@@ -178,7 +178,7 @@ pub fn iterate_elements<F: FnMut(&Element)>(dfa: &Dfa, mut limit: Option<usize>,
 
         for a in 1..asize /* 1 is correct here! */ {
             c_state.element.set_symbol(a);
-            let new_state = c_def.dfa.get_state(0)[a];
+            let new_state = c_def.dfa.get_row(0)[a];
             if Bound::Finite(length - 1) <= c_def.long[new_state as usize] {
                 finished = false;
                 if compute(&c_def, &mut c_state, new_state, length - 1) {
@@ -201,7 +201,7 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     let dfa = dfa.reverse().make_dfa();
     let mut lengths = longest_words(&dfa);
 
-    let mut state = dfa.get_state(0)[1];
+    let mut state = dfa.get_row(0)[1];
 
     //dfa.clone().to_nfa().write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
 
@@ -210,7 +210,7 @@ pub fn get_max_value(nfa: &Nfa, track_id: usize) -> Bound {
     } else {
         let mut value: usize = 1;
         loop {
-            let s = dfa.get_state(state);
+            let s = dfa.get_row(state);
             match (lengths[s[0] as usize], lengths[s[1] as usize]) {
                 (Bound::None, Bound::None) => break Bound::Finite(value),
                 (Bound::Infinite, _) | (_, Bound::Infinite) => break Bound::Infinite,
@@ -275,9 +275,9 @@ pub fn cut(element: &Element) -> Nfa {
 
     let nfa = Nfa::new(TransitionTable::new(element.n_tracks(), data), accepting, Nfa::simple_init());
     nfa.write_dot(std::path::Path::new("/tmp/xx.dot"), false).unwrap();
-    nfa.to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
-    nfa.to_dfa().reverse().to_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
-    nfa.to_dfa().reverse()
+    nfa.make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/yy.dot"), false).unwrap();
+    nfa.make_dfa().reverse().make_dfa().to_nfa().write_dot(std::path::Path::new("/tmp/rr.dot"), false).unwrap();
+    nfa.make_dfa().reverse()
 }
 
 pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
@@ -290,12 +290,12 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
         nth_element -= 1;
     }
 
-    let dfa = dfa.reverse().to_dfa();
+    let dfa = dfa.reverse().make_dfa();
 
     let mut target_len = 0;
     let mut lengths = vec![number_of_words_zero_length(&dfa)];
 
-    let transitions = dfa.get_state(0);
+    let transitions = dfa.get_row(0);
     let mut remaining = nth_element;
     let mut sym = 0;
 
@@ -324,16 +324,16 @@ pub fn get_nth_element(dfa: &Dfa, mut nth_element: usize) -> Element {
     }
 
     element.push_symbol(sym);
-    let mut state = dfa.get_state(0)[sym];
+    let mut state = dfa.get_row(0)[sym];
     lengths.pop();
 
     for lens in lengths.iter().rev() {
         let mut found = false;
-        for (i, tr) in dfa.get_state(state).iter().enumerate() {
+        for (i, tr) in dfa.get_row(state).iter().enumerate() {
             let len = lens[*tr as usize];
             if remaining < len {
                 element.push_symbol(i);
-                state = dfa.get_state(state)[i];
+                state = dfa.get_row(state)[i];
                 found = true;
                 break;
             }
@@ -369,7 +369,7 @@ mod tests {
         assert!(collect_words(&a, Some(0)).is_empty());
         assert_eq!(collect_words(&a, Some(7)), vec![vec![220], vec![10]]);
         assert_eq!(collect_words(&a, Some(1)), vec![vec![220]]);*/
-        let a = build_set(&parse_setdef("{ x, y | x > 3 and (x + y == 10)}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x, y | x > 3 and (x + y == 10)}")).into_dfa();
         println!("{}", collect_elements(&a, Some(700)).len());
         assert_eq!(collect_elements(&a, Some(3)), vec![vec![7, 3], vec![5, 5], vec![6, 4]]);
     }
@@ -383,100 +383,100 @@ mod tests {
         assert_eq!(collect_words(&a, Some(7)), vec![vec![220], vec![10]]);
         assert_eq!(collect_words(&a, Some(1)), vec![vec![220]]);*/
 
-        let a = build_set(&parse_setdef("{ x, y | 11 * x == 3 * y and not (x == 0) }")).to_dfa();
+        let a = build_set(&parse_setdef("{ x, y | 11 * x == 3 * y and not (x == 0) }")).into_dfa();
         println!("{}", collect_elements(&a, Some(2)).len());
         assert_eq!(collect_elements(&a, Some(3)), vec![vec![3, 11], vec![6, 22], vec![9, 33]]);
     }
 
     #[test]
     fn test_words_list3() {
-        let a = build_set(&parse_setdef("{ x | x == 1 }")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 1 }")).into_dfa();
         assert_eq!(collect_elements(&a, Some(2)), vec![vec![1]]);
 
-        let a = build_set(&parse_setdef("{ x | x == 2 }")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 2 }")).into_dfa();
         assert_eq!(collect_elements(&a, Some(2)), vec![vec![2]]);
 
-        let a = build_set(&parse_setdef("{ x | x == 1234567 }")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 1234567 }")).into_dfa();
         assert_eq!(collect_elements(&a, Some(2)), vec![vec![1234567]]);
 
-        let a = build_set(&parse_setdef("{ x | x == 314 or x == 25 }")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 314 or x == 25 }")).into_dfa();
         assert_eq!(collect_elements(&a, Some(2)), vec![vec![25], vec![314]]);
     }
 
     #[test]
     fn test_range() {
-        let a = build_set(&parse_setdef("{ x, y | x == 10}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x, y | x == 10}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Finite(10));
         assert_eq!(get_max_value(&a, 1), Bound::Infinite);
 
-        let a = build_set(&parse_setdef("{ x, y | x < 0}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x, y | x < 0}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::None);
 
-        let a = build_set(&parse_setdef("{ x, y | x < 1}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x, y | x < 1}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Finite(0));
 
-        let a = build_set(&parse_setdef("{ x, y | x < 2}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x, y | x < 2}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Finite(1));
 
-        let a = build_set(&parse_setdef("{ x, y | x < 12 or x == 123}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x, y | x < 12 or x == 123}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Finite(123));
 
-        let a = build_set(&parse_setdef("{ x | x == a + b and a < 10 and b < a + 4 and u + v == x and u == v}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x | x == a + b and a < 10 and b < a + 4 and u + v == x and u == v}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Finite(20));
 
-        let a = build_set(&parse_setdef("{ x | x == 72300 or x == 23 or x > 512}")).to_nfa();
+        let a = build_set(&parse_setdef("{ x | x == 72300 or x == 23 or x > 512}")).into_nfa();
         assert_eq!(get_max_value(&a, 0), Bound::Infinite);
     }
 
     #[test]
     fn test_size() {
-        let a = build_set(&parse_setdef("{ x | x == 1}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(1));
-        let a = build_set(&parse_setdef("{ x | x == 0}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(1));
-        let a = build_set(&parse_setdef("{ x | not (x == x)}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(0));
-        let a = build_set(&parse_setdef("{ x | x < 10}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(10));
-        let a = build_set(&parse_setdef("{ x | x < 10 and not x == 1}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(9));
-        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(10000));
-        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100 and not (x == y) or (x == 123 and y == 321)}")).to_nfa();
-        assert_eq!(number_of_elements(&a.to_dfa()), Some(9901));
+        let a = build_set(&parse_setdef("{ x | x == 1}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(1));
+        let a = build_set(&parse_setdef("{ x | x == 0}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(1));
+        let a = build_set(&parse_setdef("{ x | not (x == x)}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(0));
+        let a = build_set(&parse_setdef("{ x | x < 10}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(10));
+        let a = build_set(&parse_setdef("{ x | x < 10 and not x == 1}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(9));
+        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(10000));
+        let a = build_set(&parse_setdef("{ x, y | x < 100 and y < 100 and not (x == y) or (x == 123 and y == 321)}")).into_nfa();
+        assert_eq!(number_of_elements(&a.make_dfa()), Some(9901));
     }
 
     #[test]
     fn test_nth_element() {
-        let a = build_set(&parse_setdef("{ x | x == 0}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 0}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![0]);
 
-        let a = build_set(&parse_setdef("{ x | x == 1}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 1}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1]);
 
-        let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x == 1 or x == 3}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1]);
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![3]);
 
-        let a = build_set(&parse_setdef("{ x | x < 10}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x < 10}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![0]);
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![1]);
         assert_eq!(get_nth_element(&a, 2).into_vec(), vec![2]);
         assert_eq!(get_nth_element(&a, 9).into_vec(), vec![9]);
 
-        let a = build_set(&parse_setdef("{ x | x > 55}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | x > 55}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![56]);
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![57]);
         assert_eq!(get_nth_element(&a, 2).into_vec(), vec![58]);
         assert_eq!(get_nth_element(&a, 12077).into_vec(), vec![56 + 12077]);
 
-        let a = build_set(&parse_setdef("{ x | 111 * y == x and x > 100 and (not exists(z)(2 * z == x))}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x | 111 * y == x and x > 100 and (not exists(z)(2 * z == x))}")).into_dfa();
 
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![111]);
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![333]);
         assert_eq!(get_nth_element(&a, 2).into_vec(), vec![555]);
 
-        let a = build_set(&parse_setdef("{ x, y | x == y + 1}")).to_dfa();
+        let a = build_set(&parse_setdef("{ x, y | x == y + 1}")).into_dfa();
         assert_eq!(get_nth_element(&a, 0).into_vec(), vec![1, 0]);
         assert_eq!(get_nth_element(&a, 1).into_vec(), vec![2, 1]);
         assert_eq!(get_nth_element(&a, 2).into_vec(), vec![3, 2]);
@@ -490,7 +490,7 @@ mod tests {
         let a = build_set(&parse_setdef(def));
 
         let (c, d) = a.cut2(16);
-        assert_eq!(number_of_elements(&c.to_dfa()), Some(17));
+        assert_eq!(number_of_elements(&c.into_dfa()), Some(17));
 
 
         /*let mut i = 0;

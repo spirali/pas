@@ -7,7 +7,7 @@ use crate::solver::AutomaticSet;
 
 pub fn render_set_png<W: Write>(dfas: &[&Dfa], colors: &[[u8; 3]], writer: &mut W) {
     assert!(dfas.iter().all(|x| x.n_tracks() == 2));
-    let nfas: Vec<_> = dfas.iter().map(|dfa| dfa.as_nfa()).collect();
+    let nfas: Vec<_> = dfas.iter().map(|dfa| dfa.make_nfa()).collect();
     let size_x: usize = nfas.iter().map(|nfa| get_max_value(nfa, 0).to_limit().unwrap()).max().unwrap();
     let size_y: usize = nfas.iter().map(|nfa| get_max_value(nfa, 1).to_limit().unwrap()).max().unwrap();
 

@@ -59,7 +59,7 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         }
     };
 
-    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
+    for (i, (s, a)) in dfa.rows_and_acc().enumerate() {
         let state = i as StateId;
         if !a && s.iter().all(|x| *x == state) {
             output[i] = Bound::None;
@@ -73,7 +73,7 @@ pub fn longest_words(dfa: &Dfa) -> Vec<Bound>
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();
         for s in &s_current {
-            let mut length: Bound = dfa.get_state(*s).iter().map(|c| output[*c as usize]).max().unwrap().increase();
+            let mut length: Bound = dfa.get_row(*s).iter().map(|c| output[*c as usize]).max().unwrap().increase();
             if dfa.is_accepting(*s) {
                 length = length.max(Bound::Finite(0))
             }
@@ -105,7 +105,7 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
         }
     };
 
-    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
+    for (i, (s, a)) in dfa.rows_and_acc().enumerate() {
         let state = i as StateId;
         if !a && s.iter().all(|x| *x == state) {
             output[i] = Some(0);
@@ -119,7 +119,7 @@ pub fn number_of_words(dfa: &Dfa) -> Vec<Option<usize>>
         std::mem::swap(&mut s_current, &mut s_next);
         s_next.clear();
         for s in &s_current {
-            let mut size: usize = dfa.get_state(*s).iter().map(|c| output[*c as usize].unwrap()).sum();
+            let mut size: usize = dfa.get_row(*s).iter().map(|c| output[*c as usize].unwrap()).sum();
             if dfa.is_accepting(*s) {
                 size += 1;
             }
@@ -137,7 +137,7 @@ pub fn shortest_words(dfa: &Dfa) -> Vec<Option<usize>>
     let mut n_next = HashSet::<StateId>::with_capacity(dfa.n_states());
     let mut reverse = vec![Vec::<StateId>::new(); dfa.n_states()];
 
-    for (i, (s, a)) in dfa.states_and_acc().enumerate() {
+    for (i, (s, a)) in dfa.rows_and_acc().enumerate() {
         let state_id = i as StateId;
         for t in s {
             reverse[*t as usize].push(state_id);
@@ -165,7 +165,7 @@ pub fn number_of_words_zero_length(dfa: &Dfa) -> Vec<usize> {
 }
 
 pub fn number_of_words_next_length(dfa: &Dfa, prev: &Vec<usize>) -> Vec<usize> {
-    dfa.states().map(|s| {
+    dfa.rows().map(|s| {
         s.iter().map(|t| prev[*t as usize]).sum()
     }).collect()
 }
@@ -174,8 +174,6 @@ pub fn number_of_words_next_length(dfa: &Dfa, prev: &Vec<usize>) -> Vec<usize> {
 mod tests {
     use crate::automata::TransitionTable;
     use crate::common::Name;
-    use crate::highlevel::parser::{parse_formula, parse_setdef};
-    use crate::solver::commands::build_set;
 
     use super::*;
 

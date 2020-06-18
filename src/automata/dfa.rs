@@ -36,6 +36,14 @@ impl Dfa {
         }
     }
 
+    pub fn to_nfa(self) -> Nfa {
+        Nfa::new(self.table.map_transitions(|s| Transition::simple(*s)), self.accepting, Nfa::simple_init())
+    }
+
+    pub fn make_nfa(&self) -> Nfa {
+        Nfa::new(self.table.map_transitions(|s| Transition::simple(*s)), self.accepting.clone(), Nfa::simple_init())
+    }
+
     #[inline]
     pub fn n_tracks(&self) -> usize {
         self.table.n_tracks()
@@ -52,18 +60,18 @@ impl Dfa {
     }
 
     #[inline]
-    pub fn get_state(&self, state_id: StateId) -> &[StateId] {
-        self.table.get_state(state_id)
+    pub fn get_row(&self, state_id: StateId) -> &[StateId] {
+        self.table.get_row(state_id)
     }
 
     #[inline]
-    pub fn states_and_acc(&self) -> impl Iterator<Item=(&[StateId], bool)> {
-        self.table.states().zip(self.accepting.iter().copied())
+    pub fn rows_and_acc(&self) -> impl Iterator<Item=(&[StateId], bool)> {
+        self.table.rows().zip(self.accepting.iter().copied())
     }
 
     #[inline]
-    pub fn states(&self) -> impl Iterator<Item=&[StateId]> {
-        self.table.states()
+    pub fn rows(&self) -> impl Iterator<Item=&[StateId]> {
+        self.table.rows()
     }
 
     #[inline]
@@ -81,20 +89,14 @@ impl Dfa {
         self.table.as_slice()
     }
 
+    #[inline]
     pub fn add_track(&mut self) {
         self.table = self.table.add_track();
     }
 
+    #[inline]
     pub fn swap_tracks(&mut self, index1: usize, index2: usize) {
         self.table.swap_tracks(index1, index2);
-    }
-
-    pub fn to_nfa(self) -> Nfa {
-        Nfa::new(self.table.map_states(|s| Transition::simple(*s)), self.accepting, Nfa::simple_init())
-    }
-
-    pub fn as_nfa(&self) -> Nfa {
-        Nfa::new(self.table.map_states(|s| Transition::simple(*s)), self.accepting.clone(), Nfa::simple_init())
     }
 
     pub fn reverse_table(&self) -> TransitionTable<Transition>
@@ -103,12 +105,11 @@ impl Dfa {
         states.resize(self.table.size(), Transition::empty());
         let mut table = TransitionTable::new(self.table.n_tracks(), states);
 
-        for (idx, state) in self.table.states().enumerate() {
+        for (idx, state) in self.table.rows().enumerate() {
             for (idx2, t) in state.iter().enumerate() {
-                table.get_state_mut(*t)[idx2].states.push(idx as StateId);
+                table.get_row_mut(*t)[idx2].states.push(idx as StateId);
             }
         }
-
         table
     }
 
@@ -116,7 +117,7 @@ impl Dfa {
     {
         let mut output = Vec::new();
         output.resize(self.table.size(), Vec::new());
-        for (idx, state) in self.table.states().enumerate() {
+        for (idx, state) in self.table.rows().enumerate() {
             for t in state.iter() {
                 output[*t as usize].push(idx as StateId);
             }
@@ -138,18 +139,8 @@ impl Dfa {
     pub fn test_input<I: Iterator<Item=usize>>(&self, word: I) -> bool {
         let mut state: StateId = 0;
         for a in word {
-            state = self.table.get_state(state)[a];
+            state = self.table.get_row(state)[a];
         }
-
-        /*
-        /* Add infinite zero suffix */
-        loop {
-            let mut prev = state;
-            state = self.table.get_state(state)[0];
-            if prev == state {
-                break;
-            }
-        }*/
         self.accepting[state as usize]
     }
 
@@ -157,7 +148,7 @@ impl Dfa {
         let mut repeat = true;
         while repeat {
             repeat = false;
-            for (i, states) in self.table.states().enumerate() {
+            for (i, states) in self.table.rows().enumerate() {
                 if self.accepting[i] {
                     continue;
                 }

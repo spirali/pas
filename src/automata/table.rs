@@ -47,30 +47,30 @@ impl<T: Default + Clone> TransitionTable<T> {
     }
 
     #[inline]
-    pub fn get_state_mut(&mut self, state: StateId) -> &mut [T] {
-        let asize = self.alphabet_size();
-        let start = state as usize * asize;
-        &mut self.transitions[start..start + asize]
+    pub fn get_row_mut(&mut self, state: StateId) -> &mut [T] {
+        let a_size = self.alphabet_size();
+        let start = state as usize * a_size;
+        &mut self.transitions[start..start + a_size]
     }
 
     #[inline]
-    pub fn get_state(&self, state: StateId) -> &[T] {
-        let asize = self.alphabet_size();
-        let start = state as usize * asize;
-        &self.transitions[start..start + asize]
+    pub fn get_row(&self, state: StateId) -> &[T] {
+        let a_size = self.alphabet_size();
+        let start = state as usize * a_size;
+        &self.transitions[start..start + a_size]
     }
 
-    pub fn states_mut(&mut self) -> impl Iterator<Item=&mut [T]> {
-        let size = self.alphabet_size();
-        self.transitions.chunks_mut(size)
+    pub fn rows_mut(&mut self) -> impl Iterator<Item=&mut [T]> {
+        let a_size = self.alphabet_size();
+        self.transitions.chunks_mut(a_size)
     }
 
-    pub fn states(&self) -> impl Iterator<Item=&[T]> {
-        let size = self.alphabet_size();
-        self.transitions.chunks(size)
+    pub fn rows(&self) -> impl Iterator<Item=&[T]> {
+        let a_size = self.alphabet_size();
+        self.transitions.chunks(a_size)
     }
 
-    pub fn map_states<S, F>(&self, f: F) -> TransitionTable<S> where F: FnMut(&T) -> S, S: Default + Clone {
+    pub fn map_transitions<S, F>(&self, f: F) -> TransitionTable<S> where F: FnMut(&T) -> S, S: Default + Clone {
         TransitionTable {
             n_tracks: self.n_tracks,
             transitions: self.transitions.iter().map(f).collect(),
@@ -83,12 +83,12 @@ impl<T: Default + Clone> TransitionTable<T> {
         if track1 == track2 {
             return;
         }
-        let asize = self.alphabet_size();
+        let a_size = self.alphabet_size();
         let mask1 = 1 << track1;
         let mask2 = 1 << track2;
         let mask = mask1 | mask2;
-        for row in self.states_mut() {
-            for a in 0..asize {
+        for row in self.rows_mut() {
+            for a in 0..a_size {
                 if (a & mask1 == 0) & (a & mask2 > 0) {
                     let tmp = std::mem::take(&mut row[a]);
                     row[a] = std::mem::take(&mut row[a ^ mask]);
@@ -100,7 +100,7 @@ impl<T: Default + Clone> TransitionTable<T> {
 
     pub fn add_track(&self) -> TransitionTable<T> {
         let mut new_transitions = Vec::with_capacity(self.n_states() * self.alphabet_size() * 2);
-        for state in self.states() {
+        for state in self.rows() {
             new_transitions.extend_from_slice(state);
             new_transitions.extend_from_slice(state);
         }
@@ -121,12 +121,12 @@ impl TransitionTable<Transition> {
     pub fn merge_first_track(&self) -> TransitionTable<Transition> {
         assert!(self.n_tracks > 0);
         let mut new_transitions = Vec::new();
-        let target_asize = self.alphabet_size() / 2;
-        new_transitions.resize(target_asize * self.n_states(), Transition::empty());
+        let target_a_size = self.alphabet_size() / 2;
+        new_transitions.resize(target_a_size * self.n_states(), Transition::empty());
 
-        for (idx, state) in self.states().enumerate() {
+        for (idx, state) in self.rows().enumerate() {
             for (eidx, e) in state.iter().enumerate() {
-                let tr = &mut new_transitions[idx * target_asize + eidx / 2];
+                let tr = &mut new_transitions[idx * target_a_size + eidx / 2];
                 for s in &e.states {
                     if !tr.states.contains(&s) {
                         tr.states.push(*s);

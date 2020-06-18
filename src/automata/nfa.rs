@@ -73,7 +73,7 @@ impl Nfa {
         return init;
     }
 
-    pub fn to_dfa(&self) -> Dfa {
+    pub fn make_dfa(&self) -> Dfa {
         self.determinize().minimize()
     }
 
@@ -119,18 +119,10 @@ impl Nfa {
                     new_id += 1;
                     map.insert(fs, new_id);
                     accepting.push(new_state.iter().any(|s| self.accepting[*s as usize]));
-                    //transitions.extend_from_slice(&[0; asize]);
                     transitions.resize(transitions.len() + asize, 0 as StateId);
                     stack.push((new_id, new_state));
                     new_id
                 });
-                /*let id = *map.entry(new_state).or_insert_with(|| {
-                    new_id += 1;
-                    accepting.push(new_state.iter().any(|s| self.accepting[s]));
-                    transitions.extend_from_slice(&[0; asize]);
-                    stack.push((new_id, new_state));
-                    new_id
-                });*/
                 transitions[s_id * asize + a] = id as StateId;
             }
         }
@@ -173,7 +165,7 @@ impl Nfa {
         let mut repeat = true;
         while repeat {
             repeat = false;
-            for (i, states) in self.table.states().enumerate() {
+            for (i, states) in self.table.rows().enumerate() {
                 if self.accepting[i] {
                     continue;
                 }
@@ -188,14 +180,10 @@ impl Nfa {
         }
     }
 
-    pub fn make_dfa(&self) -> Dfa {
-        self.determinize().minimize()
-    }
-
     pub fn write_dot(&self, path: &Path, remove_sink: bool) -> std::io::Result<()> {
         let sink: Option<StateId> = if remove_sink {
             self.accepting.iter().enumerate().find(|(i, a)| {
-                !**a && self.table.get_state(*i as StateId).iter().all(|x| x.is_simple(*i as StateId)) && !self.initial_states.contains(&(*i as StateId))
+                !**a && self.table.get_row(*i as StateId).iter().all(|x| x.is_simple(*i as StateId)) && !self.initial_states.contains(&(*i as StateId))
             }).map(|(i, a)| i as StateId)
         } else {
             None
@@ -216,7 +204,7 @@ impl Nfa {
 
         let symbol_strings: Vec<String> = (0..self.table.alphabet_size()).map(|x| format!("{1:00$b}", self.table.n_tracks(), x)).collect();
 
-        for (i, states) in self.table.states().enumerate() {
+        for (i, states) in self.table.rows().enumerate() {
             if Some(i as StateId) == sink {
                 continue;
             }
@@ -264,7 +252,7 @@ mod tests {
         let acc = vec![false, false, true];
         let a = make_nda(1, tr, acc, vec![0].into_iter().collect());
 
-        let m = a.determinize().minimize();
+        let m = a.make_dfa();
         assert_eq!(m.n_states(), 3);
         assert_eq!(*m.accepting(), vec![false, false, true]);
     }
